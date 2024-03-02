@@ -4,6 +4,8 @@
 use eframe::egui::{self, DragValue, Event, Vec2};
 use egui_plot::{Legend, Line, PlotPoints};
 
+pub mod clothoid;
+
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     let options = eframe::NativeOptions::default();
@@ -12,13 +14,6 @@ fn main() -> Result<(), eframe::Error> {
         options,
         Box::new(|_cc| Box::<PlotCurve>::default()),
     )
-}
-
-fn get_points(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<[f64; 2]> {
-    let mut xy = Vec::<[f64; 2]>::new();
-    xy.push((x0, y0).into());
-    xy.push((x1, y1).into());
-    xy
 }
 
 struct PlotCurve {
@@ -30,8 +25,10 @@ struct PlotCurve {
     scroll_speed: f32,
     x0: f64,
     y0: f64,
-    x1: f64,
-    y1: f64,
+    theta0: f64,
+    kappa0: f64,
+    dk: f64,
+    length: f64,
 }
 
 impl Default for PlotCurve {
@@ -45,8 +42,10 @@ impl Default for PlotCurve {
             scroll_speed: 1.0,
             x0: 0.0,
             y0: 0.0,
-            x1: 1.0,
-            y1: 0.0,
+            theta0: 0.0,
+            kappa0: 0.0,
+            dk: 0.0,
+            length: 1.0,
         }
     }
 }
@@ -75,20 +74,38 @@ impl eframe::App for PlotCurve {
 
             ui.horizontal(|ui| {
                 ui.add(
-                    DragValue::new(&mut self.x1)
+                    DragValue::new(&mut self.theta0)
                         .clamp_range(-10.0..=10.0)
                         .speed(0.1),
                 );
-                ui.label("x1").on_hover_text("x1");
+                ui.label("theta0").on_hover_text("theta0");
             });
 
             ui.horizontal(|ui| {
                 ui.add(
-                    DragValue::new(&mut self.y1)
-                        .clamp_range(-10.0..=10.0)
+                    DragValue::new(&mut self.kappa0)
+                        .clamp_range(-2.0..=2.0)
                         .speed(0.1),
                 );
-                ui.label("y1").on_hover_text("y1");
+                ui.label("kappa0").on_hover_text("kappa0");
+            });
+
+            ui.horizontal(|ui| {
+                ui.add(
+                    DragValue::new(&mut self.dk)
+                        .clamp_range(-1.5..=1.5)
+                        .speed(0.01),
+                );
+                ui.label("dk").on_hover_text("dk");
+            });
+
+            ui.horizontal(|ui| {
+                ui.add(
+                    DragValue::new(&mut self.length)
+                        .clamp_range(0.1..=20.0)
+                        .speed(0.1),
+                );
+                ui.label("length").on_hover_text("length");
             });
 
             let x_text = "Check to keep the X axis fixed, i.e., pan and zoom will only affect the Y axis";
@@ -176,7 +193,15 @@ impl eframe::App for PlotCurve {
                         plot_ui.translate_bounds(pointer_translate);
                     }
 
-                    let xy = get_points(self.x0, self.y0, self.x1, self.y1);
+                    let curve = clothoid::Clothoid::create(
+                        self.x0,
+                        self.y0,
+                        self.theta0,
+                        self.kappa0,
+                        self.dk,
+                        self.length,
+                    );
+                    let xy = curve.get_points(100);
                     let curve_points = PlotPoints::new(xy);
                     plot_ui.line(Line::new(curve_points).name("Curve"));
                 });
