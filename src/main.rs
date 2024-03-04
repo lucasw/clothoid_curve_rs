@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use eframe::egui::{self, DragValue, Event, Vec2};
-use egui_plot::{Legend, Line, PlotPoints};
+use egui_plot::{Legend, Line, LineStyle, PlotPoints};
 
 pub mod clothoid;
 
@@ -29,6 +29,7 @@ struct PlotCurve {
     kappa0: f64,
     dk: f64,
     length: f64,
+    count: i64,
 }
 
 impl Default for PlotCurve {
@@ -44,8 +45,9 @@ impl Default for PlotCurve {
             y0: 0.0,
             theta0: 0.0,
             kappa0: 0.0,
-            dk: 0.0,
+            dk: 5.0,
             length: 1.0,
+            count: 0,
         }
     }
 }
@@ -93,7 +95,7 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.dk)
-                        .clamp_range(-1.5..=1.5)
+                        .clamp_range(-10.0..=10.0)
                         .speed(0.01),
                 );
                 ui.label("dk").on_hover_text("dk");
@@ -202,8 +204,15 @@ impl eframe::App for PlotCurve {
                         self.length,
                     );
                     let xy = curve.get_points(100);
+                    /*
+                    if self.count % 100 == 0 {
+                        println!("{}",  self.dk);
+                        println!("{:?}", xy);
+                    }
+                    */
+                    self.count += 1;
                     let curve_points = PlotPoints::new(xy);
-                    plot_ui.line(Line::new(curve_points).name("Curve"));
+                    plot_ui.line(Line::new(curve_points).name("Curve").style(LineStyle::dashed_dense()));
                 });
         });
     }

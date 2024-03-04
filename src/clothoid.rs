@@ -177,7 +177,7 @@ fn FresnelCS(y: f64) -> (f64, f64) {
             let mut fact    = 1.0;
             let mut denterm = 3.0;
             let mut numterm = 1.0;
-            let mut sum: f64 = 1.0 / 3.0;
+            let mut sum: f64 = numterm / denterm;
             loop {
                 twofn   += 2.0;
                 fact    *= twofn * (twofn - 1.0);
@@ -195,22 +195,32 @@ fn FresnelCS(y: f64) -> (f64, f64) {
 
     } else if x < 6.0 {
         // Rational approximation for f
-        let mut sumn = 0.0;
-        let mut sumd = frd[11];
-        for k in 10..=0 {
-            sumn = frn[k] + x*sumn;
-            sumd = frd[k] + x*sumd;
+        let f: f64;
+        {
+            let mut sumn = 0.0;
+            let mut sumd = frd[11];
+            for k in (0..=10).rev() {
+                sumn = frn[k] + x*sumn;
+                // println!("    sumn = frn[{}] {} + x {} * sumn {}", frn[k], k, x, sumn);
+                sumd = frd[k] + x*sumd;
+                // println!("    sumd = frd[{}] {} + x {} * sumd {}", frd[k], k, x, sumd);
+            }
+            f = sumn/sumd;
+            // println!("  f = sumn {} / sumd {}", sumn, sumd);
         }
-        let f = sumn/sumd;
 
         // Rational approximation for g
-        sumn = 0.0;
-        sumd = gd[11];
-        for k in 10..=0 {
-            sumn = gn[k] + x*sumn;
-            sumd = gd[k] + x*sumd;
+        let g: f64;
+        {
+            let mut sumn = 0.0;
+            let mut sumd = gd[11];
+            for k in (0..=10).rev() {
+                sumn = gn[k] + x*sumn;
+                sumd = gd[k] + x*sumd;
+            }
+            g = sumn/sumd;
+            // println!("  g = sumn {} / sumd {}", sumn, sumd);
         }
-        let g = sumn/sumd;
 
         let U    = std::f64::consts::FRAC_PI_2 * (x*x);
         let SinU = U.sin();
@@ -218,9 +228,8 @@ fn FresnelCS(y: f64) -> (f64, f64) {
         C = 0.5 + f*SinU - g*CosU;
         S = 0.5 - f*CosU - g*SinU;
 
+        // println!("  x {}, U {}, f {}, g {}", x, U, f, g);
     } else {
-        let mut absterm;
-
         // x >= 6; asymptotic expansions for  f  and  g
 
         let s = std::f64::consts::PI * x * x;
@@ -237,7 +246,7 @@ fn FresnelCS(y: f64) -> (f64, f64) {
             numterm += 4.0;
             term    *= numterm*(numterm-2.0)*t;
             sum     += term;
-            absterm  = term.abs();
+            let absterm  = term.abs();
             /*
             UTILS_ASSERT(
                 oldterm >= absterm,
@@ -263,7 +272,7 @@ fn FresnelCS(y: f64) -> (f64, f64) {
             numterm += 4.0;
             term    *= numterm*(numterm+2.0)*t;
             sum     += term;
-            absterm  = term.abs();
+            let absterm  = term.abs();
             /*
             UTILS_ASSERT(
                 oldterm >= absterm,
@@ -277,8 +286,8 @@ fn FresnelCS(y: f64) -> (f64, f64) {
             }
         }
 
-        let mut g = std::f64::consts::PI *x;
-        g = sum/(g*g*x);
+        let g0 = std::f64::consts::PI * x;
+        let g = sum / (g0 * g0 * x);
 
         let U    = std::f64::consts::FRAC_PI_2*(x*x);
         let SinU = U.sin();
@@ -378,14 +387,17 @@ fn evalXYaSmall(a: f64, b: f64, p: usize) -> (f64, f64) {
 fn evalXYaLarge(a: f64, b: f64) -> (f64, f64) {
     let s = a.signum();
     let absa = a.abs();
-    let z    = std::f64::consts::FRAC_2_SQRT_PI * 0.5 * absa.sqrt();
-    let ell  = s * b * std::f64::consts::FRAC_2_SQRT_PI * 0.5 / absa.sqrt();
+    let m_1_sqrt_pi = std::f64::consts::FRAC_2_SQRT_PI * 0.5;
+    let z    = m_1_sqrt_pi * absa.sqrt();
+    let ell  = s * b * m_1_sqrt_pi / absa.sqrt();
     let g    = -0.5 * s * (b * b) / absa;
     let cg   = g.cos() / z;
     let sg   = g.sin() / z;
 
+    // println!("ell {}, z {}", ell, z);
     let (Cl, Sl) = FresnelCS(ell);
     let (Cz, Sz) = FresnelCS(ell + z);
+    // println!("Cl {}, Sl {}, Cz {}, Sz {}", Cl, Sl, Cz, Sz);
 
     let dC0 = Cz - Cl;
     let dS0 = Sz - Sl;
@@ -402,8 +414,10 @@ fn fresnel_cs(a: f64, b: f64, c: f64) -> (f64, f64) {
     let xx: f64;
     let yy: f64;
     if a.abs() < threshold {
+        // println!("small");
         (xx, yy) = evalXYaSmall(a, b, a_series_size);
     } else {
+        // println!("large");
         (xx, yy) = evalXYaLarge(a, b);
     };
 
@@ -412,6 +426,7 @@ fn fresnel_cs(a: f64, b: f64, c: f64) -> (f64, f64) {
 
     let int_c = xx * cosc - yy * sinc;
     let int_s = xx * sinc + yy * cosc;
+    // println!("xx {:0.2}, yy {:0.2}, int_c {:0.2}, int_s {:0.2}", xx, yy, int_c, int_s);
 
     (int_c, int_s)
 }
@@ -429,15 +444,16 @@ impl Clothoid {
         }
     }
 
-    fn xy(&self, s: f64) -> (f64, f64) {
+    fn get_xy(&self, s: f64) -> (f64, f64) {
         let (f_c, f_s) = fresnel_cs(self.dk*s*s, self.kappa0*s, self.theta0);
+        // println!("{:0.2} {:0.2} {:0.2}", s, f_c, f_s);
         let x = self.x0 + s * f_c;
         let y = self.y0 + s * f_s;
         (x, y)
     }
 
     pub fn get_points(&self, mut num: u32) -> Vec<[f64; 2]> {
-        let mut xy = Vec::<[f64; 2]>::new();
+        let mut xys = Vec::<[f64; 2]>::new();
 
         if num == 0 {
             num = 1;
@@ -447,11 +463,13 @@ impl Clothoid {
         let mut s = 0.0;
 
         for _ in 0..num {
-            xy.push(self.xy(s).into());
+            let xy = self.get_xy(s);
+            // println!("{:0.2} {:?}", s, xy);
+            xys.push(xy.into());
             s += step;
         }
 
-        xy
+        xys
     }
 }
 
