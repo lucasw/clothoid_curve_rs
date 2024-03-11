@@ -1,12 +1,9 @@
-[package]
-name = "clothoid-curve"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+  "clothoid_curve",
+  "clothoid_curve_gui",
+]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-eframe = "0.26.2"
-egui = "0.26.2"
-egui_plot = "0.26.2"
-env_logger = "0.11.2"
+[patch.crates-io]
+clothoid_curve = { path = "clothoid_curve" }
+clothoid_curve_gui = { path = "clothoid_curve_gui" }

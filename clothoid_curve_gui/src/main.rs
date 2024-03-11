@@ -1,10 +1,10 @@
 //! Adapted from egui custom_plot_manipulation example
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use clothoid_curve::Clothoid;
 use eframe::egui::{self, DragValue, Event, Vec2};
 use egui_plot::{Legend, Line, LineStyle, PlotPoints};
 
-pub mod clothoid;
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -195,7 +195,7 @@ impl eframe::App for PlotCurve {
                         plot_ui.translate_bounds(pointer_translate);
                     }
 
-                    let curve = clothoid::Clothoid::create(
+                    let curve = Clothoid::create(
                         self.x0,
                         self.y0,
                         self.theta0,

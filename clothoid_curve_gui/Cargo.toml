@@ -1,0 +1,14 @@
+[package]
+name = "clothoid_curve_gui"
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/lucasw/clothoid_curve_rs"
+readme = "../README.md"
+license = "BSD-3"
+
+[dependencies]
+clothoid_curve = {path="../clothoid_curve"}
+eframe = "0.26.2"
+egui = "0.26.2"
+egui_plot = "0.26.2"
+env_logger = "0.11.2"
