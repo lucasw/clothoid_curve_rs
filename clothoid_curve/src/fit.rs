@@ -5,6 +5,8 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+use crate::clothoid::angle_unwrap;
+use crate::clothoid::Clothoid;
 #[allow(unused_imports)]
 use argmin::{
     core::{observers::ObserverMode, CostFunction, Error, Executor, Gradient},
@@ -14,9 +16,7 @@ use argmin::{
     },
 };
 use argmin_observer_slog::SlogLogger;
-use clothoid_curve::Clothoid;
 use finitediff::FiniteDiff;
-use std::f64::consts::{FRAC_PI_2, PI};
 
 #[derive(Clone)]
 struct Curve {
@@ -46,7 +46,7 @@ impl CostFunction for Curve {
         );
         let curve_s = curve0.get_clothoid(length);
         let d_yaw = self.target_theta - curve_s.get_start_theta();
-        let d_yaw = (d_yaw + FRAC_PI_2) % PI - FRAC_PI_2;
+        let d_yaw = angle_unwrap(d_yaw);
         let mut error = d_yaw * d_yaw + 0.1 * curvature_rate * curvature_rate;
         if length < 0.0 {
             error += length * length;
@@ -64,15 +64,22 @@ impl Gradient for Curve {
     }
 }
 
-fn run() -> Result<(), Error> {
+pub fn find_clothoid(
+    x0: f64,
+    y0: f64,
+    theta0: f64,
+    curvature0: f64,
+    target_theta: f64,
+    _target_curvature: f64,
+) -> Result<Clothoid, Error> {
     // Define cost function (must implement `CostFunction` and `Gradient`)
     // Test making a left 90 degree turn
     let cost = Curve {
-        x0: 0.0,
-        y0: 0.0,
-        theta0: 0.0,
-        curvature0: 0.0,
-        target_theta: -FRAC_PI_2,
+        x0,
+        y0,
+        theta0,
+        curvature0,
+        target_theta,
     };
 
     // Define initial parameter vector
@@ -116,12 +123,5 @@ fn run() -> Result<(), Error> {
 
     println!("{curve_solution:?}");
     println!("{curve_end:?}");
-    Ok(())
-}
-
-fn main() {
-    if let Err(ref e) = run() {
-        println!("{e}");
-        std::process::exit(1);
-    }
+    Ok(curve_end)
 }
