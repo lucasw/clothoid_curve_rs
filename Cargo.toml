@@ -3,6 +3,7 @@ members = [
   "clothoid_curve",
   "clothoid_curve_gui",
 ]
+resolver = "2"
 
 [patch.crates-io]
 clothoid_curve = { path = "clothoid_curve" }
