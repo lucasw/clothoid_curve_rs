@@ -1,9 +1,13 @@
+#[derive(Debug)]
 pub struct Clothoid {
     x0: f64,     // start point x
     y0: f64,     // start point y
     theta0: f64, // start point theta/yaw/heading
     kappa0: f64, // start point curvature 1/r
-    dk: f64,     // curvature rate, how much curvature changes per unit length
+    dk: f64,     // curvature rate, how much curvature changes per unit length, end theta will be
+    // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
+    // theta(s) = theta + kappa0 * s + 1/2 * dk * s^2
+    // with s = length
     length: f64, // how long the curve is (end kappa will be length * dk)
 }
 
@@ -445,12 +449,34 @@ impl Clothoid {
         }
     }
 
+    pub fn get_start_theta(&self) -> f64 {
+        self.theta0
+    }
+    // s is length along the curve, x and y will be in same units
     fn get_xy(&self, s: f64) -> (f64, f64) {
         let (f_c, f_s) = fresnel_cs3(self.dk * s * s, self.kappa0 * s, self.theta0);
         // println!("{:0.2} {:0.2} {:0.2}", s, f_c, f_s);
         let x = self.x0 + s * f_c;
         let y = self.y0 + s * f_s;
         (x, y)
+    }
+
+    /// get a new Clothoid at this location along the current one
+    pub fn get_clothoid(&self, s: f64) -> Self {
+        let (x_s, y_s) = self.get_xy(s);
+        // https://github.com/ebertolazzi/Clothoids/blob/master/src/Clothoids/Fresnel.hxx#L142
+        // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
+        let theta_s = self.theta0 + s * (self.kappa0 + 0.5 * s * self.dk);
+        let kappa_s = s * self.dk; // curvature changes linearly with curvature_rate
+
+        Self {
+            x0: x_s,
+            y0: y_s,
+            theta0: theta_s,
+            kappa0: kappa_s,
+            dk: self.dk, // curvature rate is constant through the clothoid segment
+            length: self.length, // TODO(lucasw) just use the same length as starting clothoid, or set to 1.0?
+        }
     }
 
     pub fn get_points(&self, mut num: u32) -> Vec<[f64; 2]> {
