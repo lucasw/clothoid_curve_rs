@@ -5,7 +5,7 @@ pub fn angle_unwrap(angle_radians: f64) -> f64 {
     (angle_radians + PI) % (2.0 * PI) - PI
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Clothoid {
     pub x0: f64,     // start point x
     pub y0: f64,     // start point y
@@ -16,16 +16,6 @@ pub struct Clothoid {
     // theta(s) = theta + kappa0 * s + 1/2 * dk * s^2
     // with s = length
     pub length: f64, // how long the curve is (end kappa will be length * dk)
-}
-
-impl Clothoid {
-    pub fn curvature(&self) -> f64 {
-        self.kappa0
-    }
-
-    pub fn curvature_rate(&self) -> f64 {
-        self.dk
-    }
 }
 
 impl Default for Clothoid {
@@ -469,6 +459,15 @@ impl Clothoid {
     pub fn get_start_theta(&self) -> f64 {
         self.theta0
     }
+
+    pub fn curvature(&self) -> f64 {
+        self.kappa0
+    }
+
+    pub fn curvature_rate(&self) -> f64 {
+        self.dk
+    }
+
     // s is length along the curve, x and y will be in same units
     fn get_xy(&self, s: f64) -> (f64, f64) {
         let (f_c, f_s) = fresnel_cs3(self.dk * s * s, self.kappa0 * s, self.theta0);
@@ -484,7 +483,7 @@ impl Clothoid {
         // https://github.com/ebertolazzi/Clothoids/blob/master/src/Clothoids/Fresnel.hxx#L142
         // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
         let theta_s = self.theta0 + s * (self.kappa0 + 0.5 * s * self.dk);
-        let kappa_s = s * self.dk; // curvature changes linearly with curvature_rate
+        let kappa_s = self.kappa0 + s * self.dk; // curvature changes linearly with curvature_rate
 
         Self {
             x0: x_s,
@@ -514,5 +513,34 @@ impl Clothoid {
         }
 
         xys
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn curvatures() {
+        // radius = 2.0
+        let curvature = 0.5;
+        let length = 1.0;
+        let clothoid0 = Clothoid::create(
+            0.0,
+            0.0,
+            0.0,
+            curvature,
+            0.0,
+            length,
+        );
+
+        // sample the clothoid at the end
+        let clothoid1 = clothoid0.get_clothoid(length);
+        // curvature_rate should not change
+        assert!(clothoid0.curvature_rate() == clothoid1.curvature_rate());
+
+        // with no curvature rate, output clothoid curvature should always match input
+        let msg = format!("{} -> {} at rate {}", clothoid0.curvature(), clothoid1.curvature(), clothoid0.curvature_rate());
+        assert!(clothoid0.curvature() == clothoid1.curvature(), "{}", msg);
     }
 }
