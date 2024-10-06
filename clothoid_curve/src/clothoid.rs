@@ -7,15 +7,25 @@ pub fn angle_unwrap(angle_radians: f64) -> f64 {
 
 #[derive(Debug)]
 pub struct Clothoid {
-    x0: f64,     // start point x
-    y0: f64,     // start point y
-    theta0: f64, // start point theta/yaw/heading
-    kappa0: f64, // start point curvature 1/r
-    dk: f64,     // curvature rate, how much curvature changes per unit length, end theta will be
+    pub x0: f64,     // start point x
+    pub y0: f64,     // start point y
+    pub theta0: f64, // start point theta/yaw/heading
+    kappa0: f64,     // start point curvature 1/r
+    dk: f64, // curvature rate, how much curvature changes per unit length, end theta will be
     // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
     // theta(s) = theta + kappa0 * s + 1/2 * dk * s^2
     // with s = length
-    length: f64, // how long the curve is (end kappa will be length * dk)
+    pub length: f64, // how long the curve is (end kappa will be length * dk)
+}
+
+impl Clothoid {
+    pub fn curvature(&self) -> f64 {
+        self.kappa0
+    }
+
+    pub fn curvature_rate(&self) -> f64 {
+        self.dk
+    }
 }
 
 impl Default for Clothoid {
@@ -447,12 +457,12 @@ fn fresnel_cs3(a: f64, b: f64, c: f64) -> (f64, f64) {
 impl Clothoid {
     pub fn create(x0: f64, y0: f64, theta0: f64, kappa0: f64, dk: f64, length: f64) -> Self {
         Self {
-            x0: x0,
-            y0: y0,
+            x0,
+            y0,
             theta0: angle_unwrap(theta0),
-            kappa0: kappa0,
-            dk: dk,
-            length: length,
+            kappa0,
+            dk,
+            length,
         }
     }
 
