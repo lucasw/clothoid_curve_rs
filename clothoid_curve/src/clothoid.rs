@@ -6,7 +6,7 @@ pub fn angle_unwrap(angle_radians: f64) -> f64 {
     (angle_radians + PI) % (2.0 * PI) - PI
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Clothoid {
     pub x0: f64,     // start point x
     pub y0: f64,     // start point y

@@ -88,7 +88,8 @@ impl Gradient for Curve {
     type Gradient = Vec<f64>;
 
     fn gradient(&self, p: &Self::Param) -> Result<Self::Gradient, Error> {
-        Ok(p.central_diff(&|x| self.cost(x).unwrap()))
+        // Ok(p.central_diff(&|x| self.cost(x).unwrap()))
+        Ok(p.forward_diff(&|x| self.cost(x).unwrap()))
     }
 }
 
@@ -103,10 +104,14 @@ pub fn find_clothoid(
     let curvature_rate_guess = clothoid0.curvature_rate();
     let length_guess = clothoid0.length;
 
-    println!(
-        "initial cost {:?}",
-        cost.cost0(curvature_rate_guess, length_guess)
-    );
+    let verbose = false;
+
+    if verbose {
+        println!(
+            "initial cost {:?}",
+            cost.cost0(curvature_rate_guess, length_guess)
+        );
+    }
 
     // if true {
     //    return Ok(clothoid0.clone());
@@ -117,7 +122,9 @@ pub fn find_clothoid(
     // will loop around the longer way- would have to test both to see which is lower cost
     // should make it so doing a loop is almost always the wrong thing
     let init_param: Vec<f64> = vec![curvature_rate_guess, length_guess];
-    println!("initial cost {:?}", cost.cost(&init_param));
+    if verbose {
+        println!("initial cost {:?}", cost.cost(&init_param));
+    }
     // tough case
     // let init_param: Vec<f64> = vec![-1.2, 1.0];
 
@@ -131,11 +138,13 @@ pub fn find_clothoid(
     // Run solver
     let res = Executor::new(cost.clone(), solver)
         .configure(|state| state.param(init_param).target_cost(0.01).max_iters(80))
-        .add_observer(SlogLogger::term(), ObserverMode::Always)
+        // .add_observer(SlogLogger::term(), ObserverMode::Always)
         .run()?;
 
     // print result
-    println!("{res}");
+    if verbose {
+        println!("{res}");
+    }
 
     let param = res.state.param.unwrap();
     let curvature_rate = param[0];
@@ -151,13 +160,15 @@ pub fn find_clothoid(
     );
     let curve_end = curve_solution.get_clothoid(length);
 
-    println!("solution start: {curve_solution:?}");
-    println!("solution end: {curve_end:?}");
-    println!(
-        "target theta {:0.3} ({:0.3}°), target_curvature {:0.3}",
-        target_theta,
-        target_theta.to_degrees(),
-        target_curvature
-    );
-    Ok(curve_end)
+    if verbose {
+        println!("solution start: {curve_solution:?}");
+        println!("solution end: {curve_end:?}");
+        println!(
+            "target theta {:0.3} ({:0.3}°), target_curvature {:0.3}",
+            target_theta,
+            target_theta.to_degrees(),
+            target_curvature
+        );
+    }
+    Ok(curve_solution)
 }

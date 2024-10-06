@@ -1,18 +1,63 @@
 //! Adapted from egui custom_plot_manipulation example
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use clothoid_curve::Clothoid;
+use clothoid_curve::{clothoid::Clothoid, fit::find_clothoid};
 use eframe::egui::{self, DragValue, Event, Vec2};
-use egui_plot::{Legend, Line, LineStyle, PlotPoints};
+use egui_plot::{Legend, Line, LineStyle, PlotPoints, Points};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::thread;
+
+type Target = (Clothoid, f64, f64);
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+
+    let (target_sender, target_receiver) = channel::<Target>();
+    let (solution_sender, solution_receiver) = channel::<Clothoid>();
+
+    // TODO(lucasw) create a thread to receive new curve and target data
+    // and then send back a solution curve periodically
+    thread::spawn(move || {
+        println!("solver threading running");
+        let mut last_target = (Clothoid::default(), 0.0, 0.0);
+        loop {
+            thread::sleep(std::time::Duration::from_millis(50));
+            // println!("waking");
+            let mut target = None;
+            while let Ok(new_target) = target_receiver.try_recv() {
+                target = Some(new_target);
+                // println!("new target rxed {new_target:?}");
+            }
+            if target.is_none() {
+                // println!("no new target");
+                continue;
+            }
+            let target = target.unwrap();
+
+            if target == last_target {
+                continue;
+            }
+            last_target = target.clone();
+
+            // solve for target theta/kappa
+            let (curve, target_theta, target_kappa) = target;
+            println!("new target received: {target_theta} {target_kappa}\n{curve:?}");
+
+            match find_clothoid(curve, target_theta, target_kappa) {
+                Ok(curve_solution) => {
+                    // println!("curve solution: {:?}", curve_solution);
+                    let _ = solution_sender.send(curve_solution);
+                }
+                Err(err) => {
+                    println!("error {:?}", err);
+                }
+            }
+        }
+    });
+
     let options = eframe::NativeOptions::default();
-    eframe::run_native(
-        "CurvePlot",
-        options,
-        Box::new(|_cc| Box::<PlotCurve>::default()),
-    )
+    let plot_curve = Box::new(PlotCurve::create(target_sender, solution_receiver));
+    eframe::run_native("CurvePlot", options, Box::new(|_cc| plot_curve))
 }
 
 struct PlotCurve {
@@ -29,10 +74,15 @@ struct PlotCurve {
     dk: f64,
     length: f64,
     count: i64,
+    target_theta: f64,
+    target_kappa: f64,
+    curve_solution: Clothoid,
+    target_sender: Sender<Target>,
+    solution_receiver: Receiver<Clothoid>,
 }
 
-impl Default for PlotCurve {
-    fn default() -> Self {
+impl PlotCurve {
+    fn create(target_sender: Sender<Target>, solution_receiver: Receiver<Clothoid>) -> Self {
         Self {
             lock_x: false,
             lock_y: false,
@@ -47,6 +97,11 @@ impl Default for PlotCurve {
             dk: 5.0,
             length: 1.0,
             count: 0,
+            target_theta: 0.0,
+            target_kappa: 0.0,
+            curve_solution: Clothoid::default(),
+            target_sender,
+            solution_receiver,
         }
     }
 }
@@ -59,7 +114,7 @@ impl eframe::App for PlotCurve {
                 ui.add(
                     DragValue::new(&mut self.x0)
                         .clamp_range(-10.0..=10.0)
-                        .speed(0.1),
+                        .speed(0.02),
                 );
                 ui.label("x0").on_hover_text("x0");
             });
@@ -68,7 +123,7 @@ impl eframe::App for PlotCurve {
                 ui.add(
                     DragValue::new(&mut self.y0)
                         .clamp_range(-10.0..=10.0)
-                        .speed(0.1),
+                        .speed(0.02),
                 );
                 ui.label("y0").on_hover_text("y0");
             });
@@ -76,8 +131,8 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.theta0)
-                        .clamp_range(-10.0..=10.0)
-                        .speed(0.1),
+                        .clamp_range(-3.2..=3.2)
+                        .speed(0.01),
                 );
                 ui.label("theta0").on_hover_text("theta0");
             });
@@ -85,8 +140,8 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.kappa0)
-                        .clamp_range(-2.0..=2.0)
-                        .speed(0.1),
+                        .clamp_range(-4.0..=4.0)
+                        .speed(0.02),
                 );
                 ui.label("kappa0").on_hover_text("kappa0");
             });
@@ -95,7 +150,7 @@ impl eframe::App for PlotCurve {
                 ui.add(
                     DragValue::new(&mut self.dk)
                         .clamp_range(-10.0..=10.0)
-                        .speed(0.01),
+                        .speed(0.04),
                 );
                 ui.label("dk").on_hover_text("dk");
             });
@@ -104,9 +159,28 @@ impl eframe::App for PlotCurve {
                 ui.add(
                     DragValue::new(&mut self.length)
                         .clamp_range(0.1..=20.0)
-                        .speed(0.1),
+                        .speed(0.02),
                 );
                 ui.label("length").on_hover_text("length");
+            });
+
+            // for solver
+            ui.horizontal(|ui| {
+                ui.add(
+                    DragValue::new(&mut self.target_theta)
+                        .clamp_range(-4.0..=4.0)
+                        .speed(0.01),
+                );
+                ui.label("target_theta (heading)").on_hover_text("target_theta radians");
+            });
+
+            ui.horizontal(|ui| {
+                ui.add(
+                    DragValue::new(&mut self.target_kappa)
+                        .clamp_range(-2.0..=2.0)
+                        .speed(0.01),
+                );
+                ui.label("target_kappa (curvature 1/r)").on_hover_text("target_kappa");
             });
 
             let x_text = "Check to keep the X axis fixed, i.e., pan and zoom will only affect the Y axis";
@@ -147,7 +221,7 @@ impl eframe::App for PlotCurve {
                 (scroll, i.pointer.primary_down(), i.modifiers)
             });
 
-            ui.label("This example shows how to use raw input events to implement different plot controls than the ones egui provides by default, e.g., default to zooming instead of panning when the Ctrl key is not pressed, or controlling much it zooms with each mouse wheel step.");
+            ui.label("Show a clothoid curve according to input controls, and also attempt to solve for desired curve end point angle and curvature given input curve initial conditions and only varying length and curvature_rate");
 
             egui_plot::Plot::new("plot")
                 .allow_zoom(false)
@@ -202,16 +276,36 @@ impl eframe::App for PlotCurve {
                         self.dk,
                         self.length,
                     );
-                    let xy = curve.get_points(100);
-                    /*
-                    if self.count % 100 == 0 {
-                        println!("{}",  self.dk);
-                        println!("{:?}", xy);
+
+                    {
+                        let xy = curve.get_points(std::cmp::max((50.0 * self.length) as u32, 100));
+                        /*
+                           if self.count % 100 == 0 {
+                           println!("{}",  self.dk);
+                           println!("{:?}", xy);
+                           }
+                           */
+                        self.count += 1;
+                        let last_pt = *xy.last().unwrap();
+                        let curve_points = PlotPoints::new(xy);
+                        plot_ui.line(Line::new(curve_points).name("Initial Curve").style(LineStyle::dashed_dense()));
+
+                        // println!("{last_pt:?}");
+                        // https://github.com/emilk/egui/discussions/2214
+                        plot_ui.points(Points::new(vec![last_pt]).radius(5.0));
                     }
-                    */
-                    self.count += 1;
-                    let curve_points = PlotPoints::new(xy);
-                    plot_ui.line(Line::new(curve_points).name("Curve").style(LineStyle::dashed_dense()));
+
+                    // println!("sending new target {} {}", self.target_theta, self.target_kappa);
+                    let _rv = self.target_sender.send((curve, self.target_theta, self.target_kappa));
+                    // println!("{rv:?}");
+
+                    while let Ok(new_solution) = self.solution_receiver.try_recv() {
+                        self.curve_solution = new_solution;
+                    }
+
+                    let xy = self.curve_solution.get_points(100);
+                    let solution_curve_points = PlotPoints::new(xy);
+                    plot_ui.line(Line::new(solution_curve_points).name("Solution Curve").style(LineStyle::dotted_loose()));
                 });
         });
     }
