@@ -1,11 +1,12 @@
 use std::f64::consts::{FRAC_PI_2, PI};
+use std::fmt;
 
 /// put angle into -pi, pi range
 pub fn angle_unwrap(angle_radians: f64) -> f64 {
     (angle_radians + PI) % (2.0 * PI) - PI
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Clothoid {
     pub x0: f64,     // start point x
     pub y0: f64,     // start point y
@@ -31,6 +32,28 @@ impl Default for Clothoid {
     }
 }
 
+impl fmt::Debug for Clothoid {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut msg = "Clothoid: [".to_string()
+            + &format!("\n\tx: {:0.3}, y: {:0.3}", self.x0, self.y0)
+            + &format!(
+                "\n\ttheta0 (initial yaw/heading): {:0.3}radians ({:0.3}°)",
+                self.theta0,
+                self.theta0.to_degrees()
+            )
+            + &format!("\n\tkappa0 (curvature 1/r): {:0.3}", self.kappa0);
+        if self.kappa0 != 0.0 {
+            msg += &format!(" radius: {:.3}", 1.0 / self.kappa0);
+        }
+        let msg =
+            msg + &format!(
+                "\n\tdk (curvature rate, curvature per unit length): {:0.6}",
+                self.dk
+            ) + &format!("\n\tlength: {:0.3}", self.length)
+                + "\n]";
+        write!(f, "{}", msg)
+    }
+}
 /*
 // This function calculates the fresnel cosine and sine integrals.
 // Input:
@@ -525,14 +548,7 @@ mod tests {
         // radius = 2.0
         let curvature = 0.5;
         let length = 1.0;
-        let clothoid0 = Clothoid::create(
-            0.0,
-            0.0,
-            0.0,
-            curvature,
-            0.0,
-            length,
-        );
+        let clothoid0 = Clothoid::create(0.0, 0.0, 0.0, curvature, 0.0, length);
 
         // sample the clothoid at the end
         let clothoid1 = clothoid0.get_clothoid(length);
@@ -540,7 +556,12 @@ mod tests {
         assert!(clothoid0.curvature_rate() == clothoid1.curvature_rate());
 
         // with no curvature rate, output clothoid curvature should always match input
-        let msg = format!("{} -> {} at rate {}", clothoid0.curvature(), clothoid1.curvature(), clothoid0.curvature_rate());
+        let msg = format!(
+            "{} -> {} at rate {}",
+            clothoid0.curvature(),
+            clothoid1.curvature(),
+            clothoid0.curvature_rate()
+        );
         assert!(clothoid0.curvature() == clothoid1.curvature(), "{}", msg);
     }
 }

@@ -11,11 +11,16 @@ fn main() {
     let target_theta: f64 = angle_unwrap(args[3].parse().unwrap());
     let target_curvature: f64 = args[4].parse().unwrap();
 
-    let curvature_rate_guess = target_curvature - curvature0;
-    let length_guess = 1.0;
+    let length_guess = {
+        if target_curvature != 0.0 {
+            (target_theta - theta0) / target_curvature
+        } else {
+            1.0
+        }
+    };
+    let curvature_rate_guess = (target_curvature - curvature0) / length_guess;
+    println!("length guess: {length_guess:0.3}, curvature_rate: {curvature_rate_guess:0.3}");
 
-    // TODO(lucasw) 'create' isn't that helpful vs. building the object directly, the latter
-    // is better because it shows which parameter is which
     let clothoid0 = Clothoid::create(
         0.0,
         0.0,

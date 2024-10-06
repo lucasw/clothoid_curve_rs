@@ -50,6 +50,28 @@ impl Curve {
             length,
         )
     }
+
+    pub fn cost0(&self, curvature_rate: f64, length: f64) -> Result<f64, Error> {
+        // TODO(lucasw) need to limit curvature_rate to a maximum
+        let curve0 = self.to_clothoid(curvature_rate, length);
+        let curve_s = curve0.get_clothoid(length);
+        // println!("curvature rates {} -> {}",  curve0.curvature_rate(), curve_s.curvature_rate());
+        // println!("curvature {} -> {}",  curve0.curvature(), curve_s.curvature());
+        let d_yaw = self.target_theta - curve_s.get_start_theta();
+        // println!("d_yaw: {d_yaw}");
+        let d_yaw = angle_unwrap(d_yaw);
+        // println!("unwrapped d_yaw: {d_yaw}");
+        let d_curvature = self.target_curvature - curve_s.curvature();
+        // println!("d_curvature: {d_curvature} = {} - {}, init curvature: {}", self.target_curvature, curve_s.curvature(), curve0.curvature());
+        let mut residual = 0.5 * (d_yaw * d_yaw)
+            + 4.0 * (d_curvature * d_curvature)
+            + 0.1 * (curvature_rate * curvature_rate);
+        // TODO(lucasw) length needs to be > 0
+        if length < 0.0 {
+            residual += length * length;
+        }
+        Ok(residual)
+    }
 }
 
 impl CostFunction for Curve {
@@ -57,19 +79,7 @@ impl CostFunction for Curve {
     type Output = f64;
 
     fn cost(&self, p: &Self::Param) -> Result<Self::Output, Error> {
-        // need to limited this to a maximum
-        let curvature_rate = p[0];
-        // TODO(lucasw) length needs to be > 0
-        let length = p[1];
-        let curve0 = self.to_clothoid(curvature_rate, length);
-        let curve_s = curve0.get_clothoid(length);
-        let d_yaw = self.target_theta - curve_s.get_start_theta();
-        let d_yaw = angle_unwrap(d_yaw);
-        let mut error = d_yaw * d_yaw + 0.1 * curvature_rate * curvature_rate;
-        if length < 0.0 {
-            error += length * length;
-        }
-        Ok(error)
+        self.cost0(p[0], p[1])
     }
 }
 
@@ -88,15 +98,26 @@ pub fn find_clothoid(
     target_curvature: f64,
 ) -> Result<Clothoid, Error> {
     // Define cost function (must implement `CostFunction` and `Gradient`)
-    // Test making a left 90 degree turn
     let cost = Curve::from_clothoid(&clothoid0, target_theta, target_curvature);
 
+    let curvature_rate_guess = clothoid0.curvature_rate();
+    let length_guess = clothoid0.length;
+
+    println!(
+        "initial cost {:?}",
+        cost.cost0(curvature_rate_guess, length_guess)
+    );
+
+    // if true {
+    //    return Ok(clothoid0.clone());
+    // }
     // Define initial parameter vector
     // easy case
     // TODO(lucasw) If the initial curvature rate is opposite target direction the solution
     // will loop around the longer way- would have to test both to see which is lower cost
     // should make it so doing a loop is almost always the wrong thing
-    let init_param: Vec<f64> = vec![clothoid0.curvature_rate(), clothoid0.length];
+    let init_param: Vec<f64> = vec![curvature_rate_guess, length_guess];
+    println!("initial cost {:?}", cost.cost(&init_param));
     // tough case
     // let init_param: Vec<f64> = vec![-1.2, 1.0];
 
@@ -109,7 +130,7 @@ pub fn find_clothoid(
 
     // Run solver
     let res = Executor::new(cost.clone(), solver)
-        .configure(|state| state.param(init_param).target_cost(0.01).max_iters(20))
+        .configure(|state| state.param(init_param).target_cost(0.01).max_iters(80))
         .add_observer(SlogLogger::term(), ObserverMode::Always)
         .run()?;
 
@@ -130,7 +151,13 @@ pub fn find_clothoid(
     );
     let curve_end = curve_solution.get_clothoid(length);
 
-    println!("{curve_solution:?}");
-    println!("{curve_end:?}");
+    println!("solution start: {curve_solution:?}");
+    println!("solution end: {curve_end:?}");
+    println!(
+        "target theta {:0.3} ({:0.3}°), target_curvature {:0.3}",
+        target_theta,
+        target_theta.to_degrees(),
+        target_curvature
+    );
     Ok(curve_end)
 }
