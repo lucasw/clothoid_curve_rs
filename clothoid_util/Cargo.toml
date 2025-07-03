@@ -7,6 +7,6 @@ edition = "2024"
 argmin = "0.10.0"
 argmin-math = "0.4.0"
 argmin-observer-slog = "0.1.0"
-clothoid_curve = { version = "0.1.0", path = "../clothoid_curve" }
+clothoid_curve = { path = "../clothoid_curve" }
 # env_logger = "0.11.2"
 finitediff = "0.1.4"
