@@ -1,7 +1,7 @@
 [workspace]
 members = [
   "clothoid_curve",
-  "clothoid_curve_gui", "clothoid_util", "diff_drive",
+  "clothoid_curve_gui", "clothoid_util", "diff_drive", "test_no_std",
 ]
 resolver = "2"
 

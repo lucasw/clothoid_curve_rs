@@ -1,0 +1,7 @@
+[package]
+name = "test_no_std"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clothoid_curve = { path = "../clothoid_curve", default-features = false }
