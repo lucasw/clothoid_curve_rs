@@ -7,6 +7,7 @@
 
 use crate::clothoid::angle_unwrap;
 use crate::clothoid::Clothoid;
+use crate::clothoid::Float;
 #[allow(unused_imports)]
 use argmin::{
     core::{observers::ObserverMode, CostFunction, Error, Executor, Gradient},
@@ -20,16 +21,16 @@ use finitediff::FiniteDiff;
 
 #[derive(Clone)]
 struct Curve {
-    x0: f64,
-    y0: f64,
-    theta0: f64,
-    curvature0: f64,
-    target_theta: f64,
-    target_curvature: f64,
+    x0: Float,
+    y0: Float,
+    theta0: Float,
+    curvature0: Float,
+    target_theta: Float,
+    target_curvature: Float,
 }
 
 impl Curve {
-    fn from_clothoid(clothoid0: &Clothoid, target_theta: f64, target_curvature: f64) -> Self {
+    fn from_clothoid(clothoid0: &Clothoid, target_theta: Float, target_curvature: Float) -> Self {
         Self {
             x0: clothoid0.x0,
             y0: clothoid0.y0,
@@ -40,7 +41,7 @@ impl Curve {
         }
     }
 
-    fn to_clothoid(&self, curvature_rate: f64, length: f64) -> Clothoid {
+    fn to_clothoid(&self, curvature_rate: Float, length: Float) -> Clothoid {
         Clothoid::create(
             self.x0,
             self.y0,
@@ -52,6 +53,8 @@ impl Curve {
     }
 
     pub fn cost0(&self, curvature_rate: f64, length: f64) -> Result<f64, Error> {
+        let curvature_rate = curvature_rate as Float;
+        let length = length as Float;
         // TODO(lucasw) need to limit curvature_rate to a maximum
         let curve0 = self.to_clothoid(curvature_rate, length);
         let curve_s = curve0.get_clothoid(length);
@@ -70,7 +73,7 @@ impl Curve {
         if length < 0.0 {
             residual += length * length;
         }
-        Ok(residual)
+        Ok(residual.into())
     }
 }
 
@@ -95,14 +98,14 @@ impl Gradient for Curve {
 
 pub fn find_clothoid(
     clothoid0: Clothoid, // initial conditions, curvature_rate and length are initial guess
-    target_theta: f64,
-    target_curvature: f64,
+    target_theta: Float,
+    target_curvature: Float,
 ) -> Result<Clothoid, Error> {
     // Define cost function (must implement `CostFunction` and `Gradient`)
     let cost = Curve::from_clothoid(&clothoid0, target_theta, target_curvature);
 
-    let curvature_rate_guess = clothoid0.curvature_rate();
-    let length_guess = clothoid0.length;
+    let curvature_rate_guess = clothoid0.curvature_rate() as f64;
+    let length_guess = clothoid0.length as f64;
 
     let verbose = false;
 
@@ -126,7 +129,7 @@ pub fn find_clothoid(
         println!("initial cost {:?}", cost.cost(&init_param));
     }
     // tough case
-    // let init_param: Vec<f64> = vec![-1.2, 1.0];
+    // let init_param: Vec<Float> = vec![-1.2, 1.0];
 
     // Pick a line search.
     // let linesearch = HagerZhangLineSearch::new();
@@ -155,10 +158,10 @@ pub fn find_clothoid(
         cost.y0,
         cost.theta0,
         cost.curvature0,
-        curvature_rate,
-        length,
+        curvature_rate as Float,
+        length as Float,
     );
-    let curve_end = curve_solution.get_clothoid(length);
+    let curve_end = curve_solution.get_clothoid(length as Float);
 
     if verbose {
         println!("solution start: {curve_solution:?}");

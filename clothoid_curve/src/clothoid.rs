@@ -1,22 +1,31 @@
-use std::f64::consts::{FRAC_PI_2, PI};
+#[cfg(not(feature = "f64"))]
+pub type Float = f32;
+#[cfg(not(feature = "f64"))]
+use std::f32::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
+
+#[cfg(feature = "f64")]
+pub type Float = f64;
+#[cfg(feature = "f64")]
+use std::f64::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
+
 use std::fmt;
 
 /// put angle into -pi, pi range
-pub fn angle_unwrap(angle_radians: f64) -> f64 {
+pub fn angle_unwrap(angle_radians: Float) -> Float {
     (angle_radians + PI) % (2.0 * PI) - PI
 }
 
 #[derive(Clone, PartialEq)]
 pub struct Clothoid {
-    pub x0: f64,     // start point x
-    pub y0: f64,     // start point y
-    pub theta0: f64, // start point theta/yaw/heading
-    kappa0: f64,     // start point curvature 1/r
-    dk: f64, // curvature rate, how much curvature changes per unit length, end theta will be
+    pub x0: Float,     // start point x
+    pub y0: Float,     // start point y
+    pub theta0: Float, // start point theta/yaw/heading
+    kappa0: Float,     // start point curvature 1/r
+    dk: Float, // curvature rate, how much curvature changes per unit length, end theta will be
     // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
     // theta(s) = theta + kappa0 * s + 1/2 * dk * s^2
     // with s = length
-    pub length: f64, // how long the curve is (end kappa will be length * dk)
+    pub length: Float, // how long the curve is (end kappa will be length * dk)
 }
 
 impl Default for Clothoid {
@@ -72,7 +81,7 @@ impl fmt::Debug for Clothoid {
 // email: sivakanth.telasula@gmail.com
 // date: August 11, 2005
 */
-const FRN: &'static [f64] = &[
+const FRN: &'static [Float] = &[
     0.49999988085884732562,
     1.3511177791210715095,
     1.3175407836168659241,
@@ -86,7 +95,7 @@ const FRN: &'static [f64] = &[
     0.0012192036851249883877,
 ];
 
-const FRD: &'static [f64] = &[
+const FRD: &'static [Float] = &[
     1.0,
     2.7022305772400260215,
     4.2059268151438492767,
@@ -101,7 +110,7 @@ const FRD: &'static [f64] = &[
     0.0038302423512931250065,
 ];
 
-const GN: &'static [f64] = &[
+const GN: &'static [Float] = &[
     0.50000014392706344801,
     0.032346434925349128728,
     0.17619325157863254363,
@@ -115,7 +124,7 @@ const GN: &'static [f64] = &[
     2.3509221782155474353e-10,
 ];
 
-const GD: &'static [f64] = &[
+const GD: &'static [Float] = &[
     1.0,
     2.0646987497019598937,
     2.9109311766948031235,
@@ -168,12 +177,12 @@ const GD: &'static [f64] = &[
 // \param[out] C \f$ C(x) \f$
 // \param[out] S \f$ S(x) \f$
 
-fn fresnel_cs(y: f64) -> (f64, f64) {
+fn fresnel_cs(y: Float) -> (Float, Float) {
     let eps = 1E-15;
     let x = y.abs();
 
-    let mut c_value: f64;
-    let mut s_value: f64;
+    let mut c_value: Float;
+    let mut s_value: Float;
 
     if x < 1.0 {
         let s = FRAC_PI_2 * (x * x);
@@ -185,7 +194,7 @@ fn fresnel_cs(y: f64) -> (f64, f64) {
             let mut fact = 1.0;
             let mut denterm = 1.0;
             let mut numterm = 1.0;
-            let mut sum: f64 = 1.0;
+            let mut sum: Float = 1.0;
             loop {
                 twofn += 2.0;
                 fact *= twofn * (twofn - 1.0);
@@ -207,7 +216,7 @@ fn fresnel_cs(y: f64) -> (f64, f64) {
             let mut fact = 1.0;
             let mut denterm = 3.0;
             let mut numterm = 1.0;
-            let mut sum: f64 = numterm / denterm;
+            let mut sum: Float = numterm / denterm;
             loop {
                 twofn += 2.0;
                 fact *= twofn * (twofn - 1.0);
@@ -224,7 +233,7 @@ fn fresnel_cs(y: f64) -> (f64, f64) {
         }
     } else if x < 6.0 {
         // Rational approximation for f
-        let f: f64;
+        let f: Float;
         {
             let mut sumn = 0.0;
             let mut sumd = FRD[11];
@@ -239,7 +248,7 @@ fn fresnel_cs(y: f64) -> (f64, f64) {
         }
 
         // Rational approximation for g
-        let g: f64;
+        let g: Float;
         {
             let mut sumn = 0.0;
             let mut sumd = GD[11];
@@ -261,7 +270,7 @@ fn fresnel_cs(y: f64) -> (f64, f64) {
     } else {
         // x >= 6; asymptotic expansions for  f  and  g
 
-        let s = std::f64::consts::PI * x * x;
+        let s = PI * x * x;
         let t = -1.0 / (s * s);
 
         // Expansion for f
@@ -289,7 +298,7 @@ fn fresnel_cs(y: f64) -> (f64, f64) {
             }
         }
 
-        let f = sum / (std::f64::consts::PI * x);
+        let f = sum / (PI * x);
 
         //  Expansion for  g
         numterm = -1.0;
@@ -315,7 +324,7 @@ fn fresnel_cs(y: f64) -> (f64, f64) {
             }
         }
 
-        let g0 = std::f64::consts::PI * x;
+        let g0 = PI * x;
         let g = sum / (g0 * g0 * x);
 
         let u_value = FRAC_PI_2 * (x * x);
@@ -332,11 +341,11 @@ fn fresnel_cs(y: f64) -> (f64, f64) {
     (c_value, s_value)
 }
 
-fn lommel_reduced(mu: f64, nu: f64, b: f64) -> f64 {
+fn lommel_reduced(mu: Float, nu: Float, b: Float) -> Float {
     let mut tmp = 1.0 / ((mu + nu + 1.0) * (mu - nu + 1.0));
     let mut res = tmp;
     for n in 1..=100 {
-        let nf = n as f64;
+        let nf = n as Float;
         tmp *= (-b / (2.0 * nf + mu - nu + 1.0)) * (b / (2.0 * nf + mu + nu + 1.0));
         res += tmp;
         if tmp.abs() < (res.abs() * 1e-50) {
@@ -346,9 +355,9 @@ fn lommel_reduced(mu: f64, nu: f64, b: f64) -> f64 {
     res
 }
 
-fn eval_xyazero(nk: usize, b: f64) -> ([f64; 43], [f64; 43]) {
-    let mut x: [f64; 43] = [0.0; 43];
-    let mut y: [f64; 43] = [0.0; 43];
+fn eval_xyazero(nk: usize, b: Float) -> ([Float; 43], [Float; 43]) {
+    let mut x: [Float; 43] = [0.0; 43];
+    let mut y: [Float; 43] = [0.0; 43];
     let sb = b.sin();
     let cb = b.cos();
     let b2 = b * b;
@@ -369,7 +378,7 @@ fn eval_xyazero(nk: usize, b: f64) -> ([f64; 43], [f64; 43]) {
         m = 1;
     }
     for k in 1..m {
-        let kf = k as f64;
+        let kf = k as Float;
         x[k] = (sb - kf * y[k - 1]) / b;
         y[k] = (kf * x[k - 1] - cb) / b;
     }
@@ -379,11 +388,11 @@ fn eval_xyazero(nk: usize, b: f64) -> ([f64; 43], [f64; 43]) {
         let d = sb - b * cb;
         let b = b * d;
         let c = -b2 * sb;
-        let m_offset = m as f64 + 0.5;
+        let m_offset = m as Float + 0.5;
         let mut r_la = lommel_reduced(m_offset, 1.5, b);
         let mut r_ld = lommel_reduced(m_offset, 0.5, b);
         for k in m..nk {
-            let kf = k as f64;
+            let kf = k as Float;
             let k_offset = kf + 1.5;
             let r_lb = lommel_reduced(k_offset, 0.5, b);
             let r_lc = lommel_reduced(k_offset, 1.5, b);
@@ -397,7 +406,7 @@ fn eval_xyazero(nk: usize, b: f64) -> ([f64; 43], [f64; 43]) {
     (x, y)
 }
 
-fn eval_xy_a_small(a: f64, b: f64, p: usize) -> (f64, f64) {
+fn eval_xy_a_small(a: Float, b: Float, p: usize) -> (Float, Float) {
     // UTILS_ASSERT(
     //   p < 11 && p > 0, "In eval_xy_a_small p = {} must be in 1..10\n", p
     // );
@@ -411,8 +420,8 @@ fn eval_xy_a_small(a: f64, b: f64, p: usize) -> (f64, f64) {
     let mut t = 1.0;
     let aa = -a * a / 4.0; // controllare!
     for n in 1..=p {
-        t *= aa / ((2 * n * (2 * n - 1)) as f64);
-        let bf = a / ((4 * n + 2) as f64);
+        t *= aa / ((2 * n * (2 * n - 1)) as Float);
+        let bf = a / ((4 * n + 2) as Float);
         let jj = 4 * n as usize;
         x += t * (x0[jj] - bf * y0[jj + 2]);
         y += t * (y0[jj] + bf * x0[jj + 2]);
@@ -420,10 +429,10 @@ fn eval_xy_a_small(a: f64, b: f64, p: usize) -> (f64, f64) {
     (x, y)
 }
 
-fn eval_xy_a_large(a: f64, b: f64) -> (f64, f64) {
+fn eval_xy_a_large(a: Float, b: Float) -> (Float, Float) {
     let s = a.signum();
     let absa = a.abs();
-    let m_1_sqrt_pi = std::f64::consts::FRAC_2_SQRT_PI * 0.5;
+    let m_1_sqrt_pi = FRAC_2_SQRT_PI * 0.5;
     let z = m_1_sqrt_pi * absa.sqrt();
     let ell = s * b * m_1_sqrt_pi / absa.sqrt();
     let g = -0.5 * s * (b * b) / absa;
@@ -444,11 +453,11 @@ fn eval_xy_a_large(a: f64, b: f64) -> (f64, f64) {
     (x, y)
 }
 
-fn fresnel_cs3(a: f64, b: f64, c: f64) -> (f64, f64) {
+fn fresnel_cs3(a: Float, b: Float, c: Float) -> (Float, Float) {
     let threshold = 0.01;
     let a_series_size = 3;
-    let xx: f64;
-    let yy: f64;
+    let xx: Float;
+    let yy: Float;
     if a.abs() < threshold {
         // println!("small");
         (xx, yy) = eval_xy_a_small(a, b, a_series_size);
@@ -468,7 +477,14 @@ fn fresnel_cs3(a: f64, b: f64, c: f64) -> (f64, f64) {
 }
 
 impl Clothoid {
-    pub fn create(x0: f64, y0: f64, theta0: f64, kappa0: f64, dk: f64, length: f64) -> Self {
+    pub fn create(
+        x0: Float,
+        y0: Float,
+        theta0: Float,
+        kappa0: Float,
+        dk: Float,
+        length: Float,
+    ) -> Self {
         Self {
             x0,
             y0,
@@ -479,20 +495,20 @@ impl Clothoid {
         }
     }
 
-    pub fn get_start_theta(&self) -> f64 {
+    pub fn get_start_theta(&self) -> Float {
         self.theta0
     }
 
-    pub fn curvature(&self) -> f64 {
+    pub fn curvature(&self) -> Float {
         self.kappa0
     }
 
-    pub fn curvature_rate(&self) -> f64 {
+    pub fn curvature_rate(&self) -> Float {
         self.dk
     }
 
     // s is length along the curve, x and y will be in same units
-    fn get_xy(&self, s: f64) -> (f64, f64) {
+    fn get_xy(&self, s: Float) -> (Float, Float) {
         let (f_c, f_s) = fresnel_cs3(self.dk * s * s, self.kappa0 * s, self.theta0);
         // println!("{:0.2} {:0.2} {:0.2}", s, f_c, f_s);
         let x = self.x0 + s * f_c;
@@ -501,7 +517,7 @@ impl Clothoid {
     }
 
     /// get a new Clothoid at this location along the current one
-    pub fn get_clothoid(&self, s: f64) -> Self {
+    pub fn get_clothoid(&self, s: Float) -> Self {
         let (x_s, y_s) = self.get_xy(s);
         // https://github.com/ebertolazzi/Clothoids/blob/master/src/Clothoids/Fresnel.hxx#L142
         // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
@@ -518,14 +534,14 @@ impl Clothoid {
         }
     }
 
-    pub fn get_points(&self, mut num: u32) -> Vec<[f64; 2]> {
-        let mut xys = Vec::<[f64; 2]>::new();
+    pub fn get_points(&self, mut num: u32) -> Vec<[Float; 2]> {
+        let mut xys = Vec::<[Float; 2]>::new();
 
         if num == 0 {
             num = 1;
         }
 
-        let step = self.length / (num as f64);
+        let step = self.length / (num as Float);
         let mut s = 0.0;
 
         for _ in 0..num {

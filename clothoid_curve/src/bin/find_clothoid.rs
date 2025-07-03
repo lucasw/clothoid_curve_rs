@@ -1,15 +1,15 @@
 /// Copyright 2024 Lucas Walter
 ///
 ///
-use clothoid_curve::clothoid::{angle_unwrap, Clothoid};
+use clothoid_curve::clothoid::{angle_unwrap, Clothoid, Float};
 use clothoid_curve::fit::find_clothoid;
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
-    let theta0: f64 = angle_unwrap(args[1].parse().unwrap());
-    let curvature0: f64 = args[2].parse().unwrap();
-    let target_theta: f64 = angle_unwrap(args[3].parse().unwrap());
-    let target_curvature: f64 = args[4].parse().unwrap();
+    let theta0: Float = angle_unwrap(args[1].parse().unwrap());
+    let curvature0: Float = args[2].parse().unwrap();
+    let target_theta: Float = angle_unwrap(args[3].parse().unwrap());
+    let target_curvature: Float = args[4].parse().unwrap();
 
     let length_guess = {
         if target_curvature != 0.0 {

@@ -1,7 +1,10 @@
 //! Adapted from egui custom_plot_manipulation example
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use clothoid_curve::{clothoid::Clothoid, fit::find_clothoid};
+use clothoid_curve::{
+    clothoid::{Clothoid, Float},
+    fit::find_clothoid,
+};
 use eframe::egui::{self, DragValue, Event, Vec2};
 use egui_plot::{Legend, Line, LineStyle, PlotPoints, Points};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -43,7 +46,7 @@ fn main() -> Result<(), eframe::Error> {
             let (curve, target_theta, target_kappa) = target;
             println!("new target received: {target_theta} {target_kappa}\n{curve:?}");
 
-            match find_clothoid(curve, target_theta, target_kappa) {
+            match find_clothoid(curve, target_theta as Float, target_kappa as Float) {
                 Ok(curve_solution) => {
                     // println!("curve solution: {:?}", curve_solution);
                     let _ = solution_sender.send(curve_solution);
@@ -269,16 +272,20 @@ impl eframe::App for PlotCurve {
                     }
 
                     let curve = Clothoid::create(
-                        self.x0,
-                        self.y0,
-                        self.theta0,
-                        self.kappa0,
-                        self.dk,
-                        self.length,
+                        self.x0 as Float,
+                        self.y0 as Float,
+                        self.theta0 as Float,
+                        self.kappa0 as Float,
+                        self.dk as Float,
+                        self.length as Float,
                     );
 
                     {
-                        let xy = curve.get_points(std::cmp::max((50.0 * self.length) as u32, 100));
+                        let xys = curve.get_points(std::cmp::max((50.0 * self.length) as u32, 100));
+                        let mut xys_b = Vec::new();
+                        for xy in xys {
+                            xys_b.push([xy[0] as f64, xy[1] as f64]);
+                        }
                         /*
                            if self.count % 100 == 0 {
                            println!("{}",  self.dk);
@@ -286,8 +293,8 @@ impl eframe::App for PlotCurve {
                            }
                            */
                         self.count += 1;
-                        let last_pt = *xy.last().unwrap();
-                        let curve_points = PlotPoints::new(xy);
+                        let last_pt = *xys_b.last().unwrap();
+                        let curve_points = PlotPoints::new(xys_b);
                         plot_ui.line(Line::new(curve_points).name("Initial Curve").style(LineStyle::dashed_dense()));
 
                         // println!("{last_pt:?}");
@@ -303,8 +310,13 @@ impl eframe::App for PlotCurve {
                         self.curve_solution = new_solution;
                     }
 
-                    let xy = self.curve_solution.get_points(100);
-                    let solution_curve_points = PlotPoints::new(xy);
+                    let xys = self.curve_solution.get_points(100);
+                    let mut xys_b = Vec::new();
+                    for xy in xys {
+                        xys_b.push([xy[0] as f64, xy[1] as f64]);
+                    }
+
+                    let solution_curve_points = PlotPoints::new(xys_b);
                     plot_ui.line(Line::new(solution_curve_points).name("Solution Curve").style(LineStyle::dotted_loose()));
                 });
         });

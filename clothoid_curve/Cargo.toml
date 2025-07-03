@@ -6,6 +6,9 @@ repository = "https://github.com/lucasw/clothoid_curve_rs"
 readme = "../README.md"
 license = "BSD-3"
 
+[features]
+f64 = []
+
 [dependencies]
 argmin = "0.10.0"
 argmin-math = "0.4.0"
