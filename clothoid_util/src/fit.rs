@@ -13,7 +13,7 @@ use argmin::{
         linesearch::{HagerZhangLineSearch, MoreThuenteLineSearch},
     },
 };
-use argmin_observer_slog::SlogLogger;
+// use argmin_observer_slog::SlogLogger;
 use clothoid_curve::clothoid::{Clothoid, Float, angle_unwrap};
 use finitediff::FiniteDiff;
 

@@ -81,7 +81,7 @@ impl fmt::Debug for Clothoid {
 // email: sivakanth.telasula@gmail.com
 // date: August 11, 2005
 */
-const FRN: &'static [Float] = &[
+const FRN: &[Float] = &[
     0.49999988085884732562,
     1.3511177791210715095,
     1.3175407836168659241,
@@ -95,7 +95,7 @@ const FRN: &'static [Float] = &[
     0.0012192036851249883877,
 ];
 
-const FRD: &'static [Float] = &[
+const FRD: &[Float] = &[
     1.0,
     2.7022305772400260215,
     4.2059268151438492767,
@@ -110,7 +110,7 @@ const FRD: &'static [Float] = &[
     0.0038302423512931250065,
 ];
 
-const GN: &'static [Float] = &[
+const GN: &[Float] = &[
     0.50000014392706344801,
     0.032346434925349128728,
     0.17619325157863254363,
@@ -124,7 +124,8 @@ const GN: &'static [Float] = &[
     2.3509221782155474353e-10,
 ];
 
-const GD: &'static [Float] = &[
+// const GD: &'static [Float] = &[
+const GD: &[Float] = &[
     1.0,
     2.0646987497019598937,
     2.9109311766948031235,
@@ -396,8 +397,8 @@ fn eval_xyazero(nk: usize, b: Float) -> ([Float; 43], [Float; 43]) {
             let k_offset = kf + 1.5;
             let r_lb = lommel_reduced(k_offset, 0.5, b);
             let r_lc = lommel_reduced(k_offset, 1.5, b);
-            x[k as usize] = (kf * a * r_la + b * r_lb + cb) / (1.0 + kf);
-            y[k as usize] = (c * r_lc + sb) / (2.0 + kf) + d * r_ld;
+            x[k] = (kf * a * r_la + b * r_lb + cb) / (1.0 + kf);
+            y[k] = (c * r_lc + sb) / (2.0 + kf) + d * r_ld;
             r_la = r_lc;
             r_ld = r_lb;
         }
@@ -422,7 +423,7 @@ fn eval_xy_a_small(a: Float, b: Float, p: usize) -> (Float, Float) {
     for n in 1..=p {
         t *= aa / ((2 * n * (2 * n - 1)) as Float);
         let bf = a / ((4 * n + 2) as Float);
-        let jj = 4 * n as usize;
+        let jj = 4 * n;
         x += t * (x0[jj] - bf * y0[jj + 2]);
         y += t * (y0[jj] + bf * x0[jj + 2]);
     }
