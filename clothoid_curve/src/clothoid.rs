@@ -1,13 +1,14 @@
 #[cfg(not(feature = "f64"))]
 pub type Float = f32;
 #[cfg(not(feature = "f64"))]
-use std::f32::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
+use core::f32::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
 
 #[cfg(feature = "f64")]
 pub type Float = f64;
 #[cfg(feature = "f64")]
 use std::f64::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
 
+#[cfg(feature = "f64")]
 use std::fmt;
 
 /// put angle into -pi, pi range
@@ -41,6 +42,7 @@ impl Default for Clothoid {
     }
 }
 
+#[cfg(feature = "f64")]
 impl fmt::Debug for Clothoid {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut msg = "Clothoid: [".to_string()
