@@ -1,10 +1,8 @@
 //! Adapted from egui custom_plot_manipulation example
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use clothoid_curve::{
-    clothoid::{Clothoid, Float},
-    fit::find_clothoid,
-};
+use clothoid_curve::clothoid::{Clothoid, Float};
+use clothoid_util::fit::find_clothoid;
 use eframe::egui::{self, DragValue, Event, Vec2};
 use egui_plot::{Legend, Line, LineStyle, PlotPoints, Points};
 use std::sync::mpsc::{channel, Receiver, Sender};

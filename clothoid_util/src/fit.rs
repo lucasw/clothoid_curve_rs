@@ -5,18 +5,16 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-use crate::clothoid::angle_unwrap;
-use crate::clothoid::Clothoid;
-use crate::clothoid::Float;
 #[allow(unused_imports)]
 use argmin::{
-    core::{observers::ObserverMode, CostFunction, Error, Executor, Gradient},
+    core::{CostFunction, Error, Executor, Gradient, observers::ObserverMode},
     solver::{
         gradientdescent::SteepestDescent,
         linesearch::{HagerZhangLineSearch, MoreThuenteLineSearch},
     },
 };
 use argmin_observer_slog::SlogLogger;
+use clothoid_curve::clothoid::{Clothoid, Float, angle_unwrap};
 use finitediff::FiniteDiff;
 
 #[derive(Clone)]

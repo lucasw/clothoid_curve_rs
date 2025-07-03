@@ -10,8 +10,3 @@ license = "BSD-3"
 f64 = []
 
 [dependencies]
-argmin = "0.10.0"
-argmin-math = "0.4.0"
-argmin-observer-slog = "0.1.0"
-env_logger = "0.11.2"
-finitediff = "0.1.4"
