@@ -57,7 +57,7 @@ fn main() -> Result<(), eframe::Error> {
 
     let options = eframe::NativeOptions::default();
     let plot_curve = Box::new(PlotCurve::create(target_sender, solution_receiver));
-    eframe::run_native("CurvePlot", options, Box::new(|_cc| plot_curve))
+    eframe::run_native("CurvePlot", options, Box::new(|_cc| Ok(plot_curve)))
 }
 
 struct PlotCurve {
@@ -113,7 +113,7 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.x0)
-                        .clamp_range(-10.0..=10.0)
+                        .range(-10.0..=10.0)
                         .speed(0.02),
                 );
                 ui.label("x0").on_hover_text("x0");
@@ -122,7 +122,7 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.y0)
-                        .clamp_range(-10.0..=10.0)
+                        .range(-10.0..=10.0)
                         .speed(0.02),
                 );
                 ui.label("y0").on_hover_text("y0");
@@ -131,7 +131,7 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.theta0)
-                        .clamp_range(-3.2..=3.2)
+                        .range(-3.2..=3.2)
                         .speed(0.01),
                 );
                 ui.label("theta0").on_hover_text("theta0");
@@ -140,7 +140,7 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.kappa0)
-                        .clamp_range(-4.0..=4.0)
+                        .range(-4.0..=4.0)
                         .speed(0.02),
                 );
                 ui.label("kappa0").on_hover_text("kappa0");
@@ -149,7 +149,7 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.dk)
-                        .clamp_range(-10.0..=10.0)
+                        .range(-10.0..=10.0)
                         .speed(0.04),
                 );
                 ui.label("dk").on_hover_text("dk");
@@ -158,7 +158,7 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.length)
-                        .clamp_range(0.1..=20.0)
+                        .range(0.1..=20.0)
                         .speed(0.02),
                 );
                 ui.label("length").on_hover_text("length");
@@ -168,7 +168,7 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.target_theta)
-                        .clamp_range(-4.0..=4.0)
+                        .range(-4.0..=4.0)
                         .speed(0.01),
                 );
                 ui.label("target_theta (heading)").on_hover_text("target_theta radians");
@@ -177,7 +177,7 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.target_kappa)
-                        .clamp_range(-2.0..=2.0)
+                        .range(-2.0..=2.0)
                         .speed(0.01),
                 );
                 ui.label("target_kappa (curvature 1/r)").on_hover_text("target_kappa");
@@ -194,7 +194,7 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.zoom_speed)
-                        .clamp_range(0.1..=2.0)
+                        .range(0.1..=2.0)
                         .speed(0.1),
                 );
                 ui.label("Zoom speed").on_hover_text("How fast to zoom in and out with the mouse wheel");
@@ -202,7 +202,7 @@ impl eframe::App for PlotCurve {
             ui.horizontal(|ui| {
                 ui.add(
                     DragValue::new(&mut self.scroll_speed)
-                        .clamp_range(0.1..=100.0)
+                        .range(0.1..=100.0)
                         .speed(0.1),
                 );
                 ui.label("Scroll speed").on_hover_text("How fast to pan with the mouse wheel");
