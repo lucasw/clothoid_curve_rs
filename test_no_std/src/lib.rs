@@ -1,3 +1,3 @@
 #![no_std]
 
-pub use clothoid_curve::*;
+pub use clothoid_curve::f32::*;

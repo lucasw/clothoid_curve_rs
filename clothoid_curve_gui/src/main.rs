@@ -1,7 +1,7 @@
 //! Adapted from egui custom_plot_manipulation example
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use clothoid_curve::clothoid::{Clothoid, Float};
+use clothoid_curve::f64::Clothoid;
 use clothoid_util::fit::find_clothoid;
 use eframe::egui::{self, DragValue, Event, Vec2};
 use egui_plot::{Legend, Line, LineStyle, PlotPoints, Points};
@@ -44,7 +44,7 @@ fn main() -> Result<(), eframe::Error> {
             let (curve, target_theta, target_kappa) = target;
             println!("new target received: {target_theta} {target_kappa}\n{curve:?}");
 
-            match find_clothoid(curve, target_theta as Float, target_kappa as Float) {
+            match find_clothoid(curve, target_theta, target_kappa) {
                 Ok(curve_solution) => {
                     // println!("curve solution: {:?}", curve_solution);
                     let _ = solution_sender.send(curve_solution);
@@ -270,19 +270,19 @@ impl eframe::App for PlotCurve {
                     }
 
                     let curve = Clothoid::create(
-                        self.x0 as Float,
-                        self.y0 as Float,
-                        self.theta0 as Float,
-                        self.kappa0 as Float,
-                        self.dk as Float,
-                        self.length as Float,
+                        self.x0,
+                        self.y0,
+                        self.theta0,
+                        self.kappa0,
+                        self.dk,
+                        self.length,
                     );
 
                     {
                         let xys = curve.get_points(std::cmp::max((50.0 * self.length) as u32, 100));
                         let mut xys_b = Vec::new();
                         for xy in xys {
-                            xys_b.push([xy[0] as f64, xy[1] as f64]);
+                            xys_b.push([xy[0], xy[1]]);
                         }
                         /*
                            if self.count % 100 == 0 {
@@ -311,7 +311,7 @@ impl eframe::App for PlotCurve {
                     let xys = self.curve_solution.get_points(100);
                     let mut xys_b = Vec::new();
                     for xy in xys {
-                        xys_b.push([xy[0] as f64, xy[1] as f64]);
+                        xys_b.push([xy[0], xy[1]]);
                     }
 
                     let solution_curve_points = PlotPoints::new(xys_b);

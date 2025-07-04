@@ -1,7 +1,7 @@
 /// Copyright 2024 Lucas Walter
 ///
 ///
-use clothoid_curve::clothoid::{Clothoid, Float, angle_unwrap};
+use clothoid_curve::f64::{Clothoid, Float, angle_unwrap};
 use clothoid_util::fit::find_clothoid;
 
 fn main() {

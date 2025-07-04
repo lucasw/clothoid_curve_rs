@@ -1,3 +1,4 @@
+/*
 #[cfg(not(feature = "f64"))]
 pub type Float = f32;
 #[cfg(not(feature = "f64"))]
@@ -7,9 +8,7 @@ use core::f32::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
 pub type Float = f64;
 #[cfg(feature = "f64")]
 use std::f64::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
-
-#[cfg(feature = "f64")]
-use std::fmt;
+*/
 
 /// put angle into -pi, pi range
 pub fn angle_unwrap(angle_radians: Float) -> Float {
@@ -42,29 +41,6 @@ impl Default for Clothoid {
     }
 }
 
-#[cfg(feature = "f64")]
-impl fmt::Debug for Clothoid {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut msg = "Clothoid: [".to_string()
-            + &format!("\n\tx: {:0.3}, y: {:0.3}", self.x0, self.y0)
-            + &format!(
-                "\n\ttheta0 (initial yaw/heading): {:0.3}radians ({:0.3}°)",
-                self.theta0,
-                self.theta0.to_degrees()
-            )
-            + &format!("\n\tkappa0 (curvature 1/r): {:0.3}", self.kappa0);
-        if self.kappa0 != 0.0 {
-            msg += &format!(" radius: {:.3}", 1.0 / self.kappa0);
-        }
-        let msg =
-            msg + &format!(
-                "\n\tdk (curvature rate, curvature per unit length): {:0.6}",
-                self.dk
-            ) + &format!("\n\tlength: {:0.3}", self.length)
-                + "\n]";
-        write!(f, "{}", msg)
-    }
-}
 /*
 // This function calculates the fresnel cosine and sine integrals.
 // Input:
@@ -83,6 +59,7 @@ impl fmt::Debug for Clothoid {
 // email: sivakanth.telasula@gmail.com
 // date: August 11, 2005
 */
+#[allow(clippy::excessive_precision)]
 const FRN: &[Float] = &[
     0.49999988085884732562,
     1.3511177791210715095,
@@ -97,6 +74,7 @@ const FRN: &[Float] = &[
     0.0012192036851249883877,
 ];
 
+#[allow(clippy::excessive_precision)]
 const FRD: &[Float] = &[
     1.0,
     2.7022305772400260215,
@@ -112,6 +90,7 @@ const FRD: &[Float] = &[
     0.0038302423512931250065,
 ];
 
+#[allow(clippy::excessive_precision)]
 const GN: &[Float] = &[
     0.50000014392706344801,
     0.032346434925349128728,
@@ -126,7 +105,7 @@ const GN: &[Float] = &[
     2.3509221782155474353e-10,
 ];
 
-// const GD: &'static [Float] = &[
+#[allow(clippy::excessive_precision)]
 const GD: &[Float] = &[
     1.0,
     2.0646987497019598937,
