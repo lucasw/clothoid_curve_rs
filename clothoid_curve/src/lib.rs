@@ -1,14 +1,25 @@
-// make f32 no_std compatible
+#![no_std]
+
 pub mod f32 {
     pub type Float = f32;
     use core::f32::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
+    use libm::cosf as cos;
+    use libm::floorf as floor;
+    use libm::sinf as sin;
+    use libm::sqrtf as sqrt;
+
     include!("clothoid.rs");
 }
 
 pub mod f64 {
     pub type Float = f64;
-    use std::f64::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
+    use core::f64::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
+    use libm::cos;
+    use libm::floor;
+    use libm::sin;
+    use libm::sqrt;
 
+    /*
     use std::fmt;
     impl fmt::Debug for Clothoid {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -32,6 +43,7 @@ pub mod f64 {
             write!(f, "{}", msg)
         }
     }
+    */
 
     include!("clothoid.rs");
 }

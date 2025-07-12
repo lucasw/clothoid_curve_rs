@@ -243,8 +243,8 @@ fn fresnel_cs(y: Float) -> (Float, Float) {
         }
 
         let u_value = FRAC_PI_2 * (x * x);
-        let sin_u = u_value.sin();
-        let cos_u = u_value.cos();
+        let sin_u = sin(u_value);
+        let cos_u = cos(u_value);
         c_value = 0.5 + f * sin_u - g * cos_u;
         s_value = 0.5 - f * cos_u - g * sin_u;
 
@@ -310,8 +310,8 @@ fn fresnel_cs(y: Float) -> (Float, Float) {
         let g = sum / (g0 * g0 * x);
 
         let u_value = FRAC_PI_2 * (x * x);
-        let sin_u = u_value.sin();
-        let cos_u = u_value.cos();
+        let sin_u = sin(u_value);
+        let cos_u = cos(u_value);
         c_value = 0.5 + f * sin_u - g * cos_u;
         s_value = 0.5 - f * cos_u - g * sin_u;
     }
@@ -340,8 +340,8 @@ fn lommel_reduced(mu: Float, nu: Float, b: Float) -> Float {
 fn eval_xyazero(nk: usize, b: Float) -> ([Float; 43], [Float; 43]) {
     let mut x: [Float; 43] = [0.0; 43];
     let mut y: [Float; 43] = [0.0; 43];
-    let sb = b.sin();
-    let cb = b.cos();
+    let sb = sin(b);
+    let cb = cos(b);
     let b2 = b * b;
     let threshold = 1e-3;
     if b.abs() < threshold {
@@ -352,7 +352,7 @@ fn eval_xyazero(nk: usize, b: Float) -> ([Float; 43], [Float; 43]) {
         y[0] = (1.0 - cb) / b;
     }
     // use recurrence in the stable part
-    let mut m = (2.0 * b).floor() as usize;
+    let mut m = floor(2.0 * b) as usize;
     if m >= nk {
         m = nk - 1;
     }
@@ -415,11 +415,11 @@ fn eval_xy_a_large(a: Float, b: Float) -> (Float, Float) {
     let s = a.signum();
     let absa = a.abs();
     let m_1_sqrt_pi = FRAC_2_SQRT_PI * 0.5;
-    let z = m_1_sqrt_pi * absa.sqrt();
-    let ell = s * b * m_1_sqrt_pi / absa.sqrt();
+    let z = m_1_sqrt_pi * sqrt(absa);
+    let ell = s * b * m_1_sqrt_pi / sqrt(absa);
     let g = -0.5 * s * (b * b) / absa;
-    let cg = g.cos() / z;
-    let sg = g.sin() / z;
+    let cg = cos(g) / z;
+    let sg = sin(g) / z;
 
     // println!("ell {}, z {}", ell, z);
     let (cl, sl) = fresnel_cs(ell);
@@ -448,8 +448,8 @@ fn fresnel_cs3(a: Float, b: Float, c: Float) -> (Float, Float) {
         (xx, yy) = eval_xy_a_large(a, b);
     };
 
-    let cosc = c.cos();
-    let sinc = c.sin();
+    let cosc = cos(c);
+    let sinc = sin(c);
 
     let int_c = xx * cosc - yy * sinc;
     let int_s = xx * sinc + yy * cosc;
@@ -516,20 +516,16 @@ impl Clothoid {
         }
     }
 
-    pub fn get_points(&self, mut num: u32) -> Vec<[Float; 2]> {
-        let mut xys = Vec::<[Float; 2]>::new();
+    pub fn get_points<const NUM: usize>(&self) -> [[Float; 2]; NUM] {
+        let mut xys = [[0.0; 2]; NUM];
 
-        if num == 0 {
-            num = 1;
-        }
-
-        let step = self.length / (num as Float);
+        let step = self.length / (NUM as Float);
         let mut s = 0.0;
 
-        for _ in 0..num {
+        for xys_i in xys.iter_mut().take(NUM) {
             let xy = self.get_xy(s);
             // println!("{:0.2} {:?}", s, xy);
-            xys.push(xy.into());
+            *xys_i = [xy.0, xy.1];
             s += step;
         }
 
@@ -539,7 +535,9 @@ impl Clothoid {
 
 #[cfg(test)]
 mod tests {
+    extern crate std;
     use super::*;
+    use std::format;
 
     #[test]
     fn curvatures() {

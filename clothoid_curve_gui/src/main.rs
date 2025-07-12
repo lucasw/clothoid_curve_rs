@@ -42,7 +42,8 @@ fn main() -> Result<(), eframe::Error> {
 
             // solve for target theta/kappa
             let (curve, target_theta, target_kappa) = target;
-            println!("new target received: {target_theta} {target_kappa}\n{curve:?}");
+            // println!("new target received: {target_theta} {target_kappa}\n{curve:?}");
+            println!("new target received: {target_theta} {target_kappa}");
 
             match find_clothoid(curve, target_theta, target_kappa) {
                 Ok(curve_solution) => {
@@ -279,7 +280,9 @@ impl eframe::App for PlotCurve {
                     );
 
                     {
-                        let xys = curve.get_points(std::cmp::max((50.0 * self.length) as u32, 100));
+                        // const num = std::cmp::max(100, (50.0 * self.length) as u32);
+                        const NUM: usize = 100;
+                        let xys = curve.get_points::<NUM>();
                         let mut xys_b = Vec::new();
                         for xy in xys {
                             xys_b.push([xy[0], xy[1]]);
@@ -308,7 +311,7 @@ impl eframe::App for PlotCurve {
                         self.curve_solution = new_solution;
                     }
 
-                    let xys = self.curve_solution.get_points(100);
+                    let xys = self.curve_solution.get_points::<100>();
                     let mut xys_b = Vec::new();
                     for xy in xys {
                         xys_b.push([xy[0], xy[1]]);

@@ -9,3 +9,4 @@ license = "BSD-3"
 [features]
 
 [dependencies]
+libm = "0.2.8"

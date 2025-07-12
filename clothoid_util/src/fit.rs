@@ -157,11 +157,11 @@ pub fn find_clothoid(
         curvature_rate,
         length,
     );
-    let curve_end = curve_solution.get_clothoid(length);
+    // let curve_end = curve_solution.get_clothoid(length);
 
     if verbose {
-        println!("solution start: {curve_solution:?}");
-        println!("solution end: {curve_end:?}");
+        // println!("solution start: {curve_solution:?}");
+        // println!("solution end: {curve_end:?}");
         println!(
             "target theta {:0.3} ({:0.3}°), target_curvature {:0.3}",
             target_theta,
