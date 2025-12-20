@@ -12,6 +12,7 @@ use stroke::f64::{CubicBezier, Point, PointN};
 // use tracing::{debug, error, info, warn};
 
 struct BezierCircleApproximation {
+    radius: f64,
     num: usize,
     angle: f64,
     handle_length: f64,
@@ -22,11 +23,46 @@ impl eframe::App for BezierCircleApproximation {
         let mut bezier_distance = Vec::new();
         TopBottomPanel::top("controls").show(ctx, |ui| {
             ui.horizontal(|ui| {
+                ui.label("radius");
+                let _resp = ui.add(
+                    egui::DragValue::new(&mut self.radius)
+                        .speed(0.003)
+                        .range(0.2..=4.0)
+                        .update_while_editing(false),
+                );
+
                 ui.label("bezier handle length");
                 let _resp = ui.add(
                     egui::DragValue::new(&mut self.handle_length)
-                        .speed(0.002)
-                        .range(0.01..=2.0)
+                        .speed(0.003)
+                        .range(0.01..=5.0)
+                        .update_while_editing(false),
+                );
+
+                // https://stackoverflow.com/a/27863181/603653
+                let num = 2.0 * PI / self.angle;
+                let optimal_length = self.radius * 4.0 / 3.0 * (PI / (2.0 * num)).tan();
+
+                if ui
+                    .button(format!("optimal {:.6}", optimal_length))
+                    .clicked()
+                {
+                    self.handle_length = optimal_length;
+                }
+
+                ui.label("num segments");
+                let _resp = ui.add(
+                    egui::DragValue::new(&mut self.num)
+                        .speed(0.04)
+                        .range(1..=16)
+                        .update_while_editing(false),
+                );
+
+                ui.label("segment angle");
+                let _resp = ui.add(
+                    egui::DragValue::new(&mut self.angle)
+                        .speed(0.01)
+                        .range(0.1..=2.0 * PI)
                         .update_while_editing(false),
                 );
             });
@@ -54,20 +90,21 @@ impl eframe::App for BezierCircleApproximation {
                             let mut angle = start_angle;
 
                             // the bezier end points
-                            let bz_pt0: [f64; 2] = [angle.cos(), angle.sin()];
+                            let bz_pt0: [f64; 2] =
+                                [self.radius * angle.cos(), self.radius * angle.sin()];
                             // angles from the end points to the handles
                             let bz_angle0 = angle + PI / 2.0;
 
                             for angle_ind in 0..(max_angle_ind + 1) {
-                                let x = angle.cos();
-                                let y = angle.sin();
+                                let x = self.radius * angle.cos();
+                                let y = self.radius * angle.sin();
                                 circle_pts.push([x, y]);
                                 if angle_ind < max_angle_ind {
                                     angle += fr;
                                 }
                             }
 
-                            let bz_pt3 = [angle.cos(), angle.sin()];
+                            let bz_pt3 = [self.radius * angle.cos(), self.radius * angle.sin()];
                             let bz_angle1 = angle - PI / 2.0;
 
                             let color = {
@@ -128,7 +165,7 @@ impl eframe::App for BezierCircleApproximation {
                                 let pt = bezier.eval(parametric_tfrac);
                                 let pt = [pt.axis(0), pt.axis(1)];
                                 // TODO(lucasw) get
-                                let dist = (pt[0] * pt[0] + pt[1] * pt[1]).sqrt() - 1.0;
+                                let dist = (pt[0] * pt[0] + pt[1] * pt[1]).sqrt() - self.radius;
                                 let angle = pt[1].atan2(pt[0]);
                                 bezier_distance.push([angle, dist]);
                                 // info!("{angle:.3}, {dist:.3}");
@@ -193,6 +230,7 @@ impl eframe::App for BezierCircleApproximation {
 impl BezierCircleApproximation {
     fn new(_cc: &eframe::CreationContext<'_>) -> Result<Self, anyhow::Error> {
         Ok(BezierCircleApproximation {
+            radius: 2.4,
             num: 4,
             angle: PI / 2.0,
             handle_length: 0.55,
