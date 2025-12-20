@@ -68,7 +68,6 @@ impl eframe::App for BezierCircleApproximation {
             });
         });
 
-        // TopBottomPanel::bottom("grid").show(ctx, |ui| {
         CentralPanel::default().show(ctx, |ui| {
             egui::Grid::new("grid").num_columns(1).show(ui, |ui| {
                 egui_plot::Plot::new("plot")
@@ -165,9 +164,10 @@ impl eframe::App for BezierCircleApproximation {
                                 let pt = bezier.eval(parametric_tfrac);
                                 let pt = [pt.axis(0), pt.axis(1)];
                                 // TODO(lucasw) get
-                                let dist = (pt[0] * pt[0] + pt[1] * pt[1]).sqrt() - self.radius;
+                                let dist = (pt[0] * pt[0] + pt[1] * pt[1]).sqrt();
                                 let angle = pt[1].atan2(pt[0]);
-                                bezier_distance.push([angle, dist]);
+                                // bezier_distance.push([angle, dist, self.radius]);
+                                bezier_distance.push([angle, dist, self.radius]);
                                 // info!("{angle:.3}, {dist:.3}");
                                 // how far it is from 1.0 is the bezier approximation error
                                 bezier_pts.push(pt);
@@ -204,6 +204,11 @@ impl eframe::App for BezierCircleApproximation {
 
                 ui.end_row();
 
+                let distance_error: Vec<[f64; 2]> = bezier_distance
+                    .clone()
+                    .into_iter()
+                    .map(|x| [x[0], x[1] - x[2]])
+                    .collect();
                 egui_plot::Plot::new("error")
                     .auto_bounds(true)
                     .allow_double_click_reset(true)
@@ -215,7 +220,7 @@ impl eframe::App for BezierCircleApproximation {
                     .view_aspect(3.0)
                     .show(ui, |plot_ui| {
                         plot_ui.points(
-                            egui_plot::Points::new(bezier_distance)
+                            egui_plot::Points::new(distance_error)
                                 .name("bezier points")
                                 .allow_hover(false)
                                 .radius(2.5)
@@ -224,16 +229,29 @@ impl eframe::App for BezierCircleApproximation {
                     });
             });
         });
+
+        TopBottomPanel::bottom("stats").show(ctx, |ui| {
+            let mut measured = Vec::new();
+            let mut expected = Vec::new();
+            for x in bezier_distance {
+                measured.push(x[1]);
+                expected.push(x[2]);
+            }
+            // println!("{vec_vec:?}");
+            let rmse = eval_metrics::regression::rmse(&measured, &expected).unwrap();
+            // ui.label(format!("rmse {rmse:.6}"));
+            ui.label(format!("rmse {rmse:.9}"));
+        });
     }
 }
 
 impl BezierCircleApproximation {
     fn new(_cc: &eframe::CreationContext<'_>) -> Result<Self, anyhow::Error> {
         Ok(BezierCircleApproximation {
-            radius: 2.4,
+            radius: 1.0,
             num: 4,
             angle: PI / 2.0,
-            handle_length: 0.55,
+            handle_length: 0.4,
         })
     }
 }
@@ -250,7 +268,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     let options = eframe::NativeOptions {
         viewport: egui::viewport::ViewportBuilder::default()
-            .with_inner_size(egui::vec2(800.0, 1100.0)),
+            .with_inner_size(egui::vec2(720.0, 1024.0)),
         ..Default::default()
     };
     let _ = eframe::run_native(

@@ -219,6 +219,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "assert_approx_eq"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c07dab4369547dbe5114677b33fbbf724971019f3818172d59a97a61c774ffd"
+
+[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -444,6 +450,7 @@ dependencies = [
  "egui",
  "egui_extras",
  "egui_plot",
+ "eval-metrics",
  "stroke",
  "tracing",
  "tracing-subscriber",
@@ -1121,6 +1128,15 @@ name = "error-code"
 version = "3.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dea2df4cf52843e0452895c455a1a2cfbb842a1e7329671acf418fdc53ed4c59"
+
+[[package]]
+name = "eval-metrics"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fbf56073880c387d319aa7a3d4fe5d38b6688c1c85d035bbbf8e5918c842cfb"
+dependencies = [
+ "assert_approx_eq",
+]
 
 [[package]]
 name = "event-listener"
