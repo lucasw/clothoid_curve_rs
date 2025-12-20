@@ -6,7 +6,7 @@ December 2025
 show how well a set of bezier curves can approximate a circle
 */
 use egui::{CentralPanel, Color32, Stroke, TopBottomPanel};
-use egui_plot::{Legend, Line};
+use egui_plot::{Legend, Line, Points};
 use std::f64::consts::PI;
 use stroke::f64::{CubicBezier, Point, PointN};
 // use tracing::{debug, error, info, warn};
@@ -81,6 +81,8 @@ impl eframe::App for BezierCircleApproximation {
                     .view_aspect(1.0)
                     .show(ui, |plot_ui| {
                         let mut start_angle: f64 = 0.0;
+                        let mut last_angle = None;
+                        let mut angle_offset = 0.0;
                         for i in 0..self.num {
                             let mut circle_pts = Vec::new();
                             let max_angle_ind = 32;
@@ -139,22 +141,30 @@ impl eframe::App for BezierCircleApproximation {
 
                             plot_ui.line(
                                 Line::new(vec![bz_pt0, bz_pt1])
-                                    .name("handle".to_string())
+                                    .name("handle")
                                     .allow_hover(false)
                                     .stroke(Stroke::new(2.0, Color32::CYAN)),
                             );
 
                             plot_ui.line(
                                 Line::new(vec![bz_pt3, bz_pt2])
-                                    .name("handle".to_string())
+                                    .name("handle")
                                     .allow_hover(false)
                                     .stroke(Stroke::new(2.0, Color32::MAGENTA)),
                             );
 
+                            plot_ui.points(
+                                Points::new(vec![bz_pt1, bz_pt2])
+                                    .name("handle")
+                                    .allow_hover(true)
+                                    .radius(4.0)
+                                    .color(Color32::CYAN),
+                            );
+
                             let bezier_length = bezier.arclen_castlejau(None);
+                            let num_t = ((bezier_length / 0.02) as usize).max(4);
 
                             let mut bezier_pts = Vec::new();
-                            let num_t = 32;
                             let fr = 1.0 / num_t as f64;
                             let mut euclidean_tfrac = 0.0;
                             for _i in 0..(num_t + 1) {
@@ -166,12 +176,23 @@ impl eframe::App for BezierCircleApproximation {
                                 // TODO(lucasw) get
                                 let dist = (pt[0] * pt[0] + pt[1] * pt[1]).sqrt();
                                 let angle = pt[1].atan2(pt[0]);
-                                // bezier_distance.push([angle, dist, self.radius]);
-                                bezier_distance.push([angle, dist, self.radius]);
+
+                                if let Some(last_angle) = last_angle {
+                                    // unwrap
+                                    if last_angle > 3.0 && angle < -3.0 {
+                                        angle_offset += 2.0 * PI;
+                                    } else if last_angle < -3.0 && angle > 3.0 {
+                                        angle_offset -= 2.0 * PI;
+                                    }
+                                }
+                                let unwrapped_angle = angle + angle_offset;
+                                bezier_distance.push([unwrapped_angle, dist, self.radius]);
                                 // info!("{angle:.3}, {dist:.3}");
                                 // how far it is from 1.0 is the bezier approximation error
                                 bezier_pts.push(pt);
                                 euclidean_tfrac += fr;
+
+                                last_angle = Some(angle);
                             }
 
                             let color = {
@@ -184,18 +205,18 @@ impl eframe::App for BezierCircleApproximation {
                             };
 
                             plot_ui.points(
-                                egui_plot::Points::new(bezier_pts.clone())
+                                Points::new(bezier_pts.clone())
                                     .name("bezier points")
                                     .allow_hover(false)
-                                    .radius(2.5)
-                                    .color(Color32::GOLD),
+                                    .radius(2.0)
+                                    .color(color),
                             );
 
                             plot_ui.line(
                                 Line::new(bezier_pts)
                                     .name("bezier".to_string())
                                     .allow_hover(false)
-                                    .stroke(Stroke::new(2.0, color)),
+                                    .stroke(Stroke::new(1.5, color)),
                             );
 
                             start_angle += self.angle;
@@ -220,11 +241,18 @@ impl eframe::App for BezierCircleApproximation {
                     .view_aspect(3.0)
                     .show(ui, |plot_ui| {
                         plot_ui.points(
-                            egui_plot::Points::new(distance_error)
-                                .name("bezier points")
+                            Points::new(distance_error.clone())
+                                .name("error points")
                                 .allow_hover(false)
                                 .radius(2.5)
                                 .color(Color32::GOLD),
+                        );
+
+                        plot_ui.line(
+                            Line::new(distance_error)
+                                .name("error")
+                                .allow_hover(false)
+                                .stroke(Stroke::new(1.2, Color32::GOLD)),
                         );
                     });
             });
