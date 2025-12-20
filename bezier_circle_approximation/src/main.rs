@@ -1,0 +1,193 @@
+/*!
+Lucas Walter
+
+December 2025
+
+show how well a set of bezier curves can approximate a circle
+*/
+use egui::{CentralPanel, Color32, Stroke, TopBottomPanel};
+use egui_plot::{Legend, Line};
+use std::f64::consts::PI;
+use stroke::f64::{CubicBezier, Point, PointN};
+// use tracing::{debug, error, info, warn};
+
+struct BezierCircleApproximation {
+    num: usize,
+    angle: f64,
+    handle_length: f64,
+}
+
+impl eframe::App for BezierCircleApproximation {
+    fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        let mut bezier_distance = Vec::new();
+        TopBottomPanel::top("controls").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("bezier handle length");
+                let _resp = ui.add(
+                    egui::DragValue::new(&mut self.handle_length)
+                        .speed(0.002)
+                        .range(0.01..=2.0)
+                        .update_while_editing(false),
+                );
+            });
+        });
+
+        CentralPanel::default().show(ctx, |ui| {
+            egui_plot::Plot::new("plot")
+                .auto_bounds(true)
+                .allow_double_click_reset(true)
+                .allow_zoom(true)
+                .allow_drag(true)
+                .allow_scroll(true)
+                .legend(Legend::default())
+                .data_aspect(1.0)
+                .show(ui, |plot_ui| {
+                    let mut angle: f64 = 0.0;
+                    for i in 0..self.num {
+                        let mut circle_pts = Vec::new();
+                        let max_angle_ind = 16;
+                        let fr = self.angle / max_angle_ind as f64;
+
+                        // the bezier end points
+                        let bz_pt0: [f64; 2] = [angle.cos(), angle.sin()];
+                        // angles from the end points to the handles
+                        let bz_angle0 = angle + PI / 2.0;
+
+                        for angle_ind in 0..(max_angle_ind + 1) {
+                            let x = angle.cos();
+                            let y = angle.sin();
+                            circle_pts.push([x, y]);
+                            if angle_ind < max_angle_ind {
+                                angle += fr;
+                            }
+                        }
+
+                        let bz_pt3 = [angle.cos(), angle.sin()];
+                        let bz_angle1 = angle - PI / 2.0;
+
+                        let color = {
+                            // if i.is_multiple_of(2) {
+                            if i % 2 == 0 {
+                                Color32::PURPLE
+                            } else {
+                                Color32::BLUE
+                            }
+                        };
+                        plot_ui.line(
+                            Line::new(circle_pts)
+                                .name("segment".to_string())
+                                .allow_hover(false)
+                                .stroke(Stroke::new(2.0, color)),
+                        );
+
+                        // find where the handles are
+                        let bz_pt1 = [
+                            bz_pt0[0] + self.handle_length * bz_angle0.cos(),
+                            bz_pt0[1] + self.handle_length * bz_angle0.sin(),
+                        ];
+                        let bz_pt2 = [
+                            bz_pt3[0] + self.handle_length * bz_angle1.cos(),
+                            bz_pt3[1] + self.handle_length * bz_angle1.sin(),
+                        ];
+                        let bezier: CubicBezier<PointN<2>, 2> = CubicBezier::new(
+                            PointN::new(bz_pt0),
+                            PointN::new(bz_pt1),
+                            PointN::new(bz_pt2),
+                            PointN::new(bz_pt3),
+                        );
+
+                        plot_ui.line(
+                            Line::new(vec![bz_pt0, bz_pt1])
+                                .name("handle".to_string())
+                                .allow_hover(false)
+                                .stroke(Stroke::new(2.0, Color32::CYAN)),
+                        );
+
+                        plot_ui.line(
+                            Line::new(vec![bz_pt3, bz_pt2])
+                                .name("handle".to_string())
+                                .allow_hover(false)
+                                .stroke(Stroke::new(2.0, Color32::MAGENTA)),
+                        );
+
+                        let bezier_length = bezier.arclen_castlejau(None);
+
+                        let mut bezier_pts = Vec::new();
+                        let num_t = 32;
+                        let fr = 1.0 / num_t as f64;
+                        let mut euclidean_tfrac = 0.0;
+                        for _i in 0..(num_t + 1) {
+                            let desired_length = euclidean_tfrac * bezier_length;
+                            let (_len, parametric_tfrac) =
+                                bezier.desired_len_to_parametric_t(desired_length, None);
+                            let pt = bezier.eval(parametric_tfrac);
+                            let pt = [pt.axis(0), pt.axis(1)];
+                            // TODO(lucasw) get
+                            bezier_distance.push((angle, (pt[0] * pt[0] + pt[1] * pt[1]).sqrt()));
+                            // how far it is from 1.0 is the bezier approximation error
+                            bezier_pts.push(pt);
+                            euclidean_tfrac += fr;
+                        }
+
+                        let color = {
+                            // if i.is_multiple_of(2) {
+                            if i % 2 == 0 {
+                                Color32::GREEN
+                            } else {
+                                Color32::LIGHT_GREEN
+                            }
+                        };
+
+                        plot_ui.points(
+                            egui_plot::Points::new(bezier_pts.clone())
+                                .name("bezier points")
+                                .allow_hover(false)
+                                .radius(2.5)
+                                .color(Color32::GOLD),
+                        );
+
+                        plot_ui.line(
+                            Line::new(bezier_pts)
+                                .name("bezier".to_string())
+                                .allow_hover(false)
+                                .stroke(Stroke::new(2.0, color)),
+                        );
+                    }
+                });
+        });
+    }
+}
+
+impl BezierCircleApproximation {
+    fn new(_cc: &eframe::CreationContext<'_>) -> Result<Self, anyhow::Error> {
+        Ok(BezierCircleApproximation {
+            num: 4,
+            angle: PI / 2.0,
+            handle_length: 0.55,
+        })
+    }
+}
+
+fn main() -> Result<(), anyhow::Error> {
+    let subscriber = tracing_subscriber::fmt()
+        .compact()
+        .with_file(true)
+        .with_line_number(true)
+        .with_thread_ids(true)
+        .with_target(true)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber)?;
+
+    let options = eframe::NativeOptions {
+        viewport: egui::viewport::ViewportBuilder::default()
+            .with_inner_size(egui::vec2(1100.0, 800.0)),
+        ..Default::default()
+    };
+    let _ = eframe::run_native(
+        "Bezier Circle Approximation",
+        options,
+        Box::new(|cc| Ok(Box::new(BezierCircleApproximation::new(cc)?))),
+    );
+
+    Ok(())
+}

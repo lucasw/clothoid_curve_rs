@@ -1,0 +1,23 @@
+[package]
+name = "bezier_circle_approximation"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.100"
+eframe = "0.31"
+egui = "0.31"
+egui_extras = { version = "0.31", features = ["all_loaders"] }
+egui_plot = "0.31"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.22"
+
+[workspace.dependencies.clothoid_curve]
+git = "https://github.com/lucasw/clothoid_curve_rs"
+branch = "update_egui"
+version = "0.3.0"
+
+[dependencies.stroke]
+git = "https://github.com/lucasw/stroke"
+branch = "f32_or_f64_only"
+version = "0.6.1"
