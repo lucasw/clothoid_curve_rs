@@ -16,6 +16,7 @@ struct BezierCircleApproximation {
     num: usize,
     angle: f64,
     handle_length: f64,
+    going_to_optimal: bool,
 }
 
 impl eframe::App for BezierCircleApproximation {
@@ -35,7 +36,7 @@ impl eframe::App for BezierCircleApproximation {
                 let _resp = ui.add(
                     egui::DragValue::new(&mut self.handle_length)
                         .speed(0.003)
-                        .range(0.01..=5.0)
+                        .range(0.0..=5.0)
                         .update_while_editing(false),
                 );
 
@@ -45,11 +46,29 @@ impl eframe::App for BezierCircleApproximation {
 
                 if ui
                     .button(format!("optimal {:.6}", optimal_length))
+                    // .is_pointer_button_down_on()
                     .clicked()
                 {
-                    self.handle_length = optimal_length;
+                    // go to optimal in one step
+                    // self.handle_length = optimal_length;
+                    self.going_to_optimal = true;
                 }
 
+                if self.going_to_optimal {
+                    // smoothly move towards optimal
+                    // info!("pressed");
+                    let error = (optimal_length - self.handle_length).clamp(-0.015, 0.015);
+                    self.handle_length += error;
+                    // if nothing changes won't get a repaint so won't get to optimal,
+                    // so force a repaint so this keeps executing
+                    if error != 0.0 {
+                        ctx.request_repaint();
+                    } else {
+                        self.going_to_optimal = false;
+                    }
+                }
+            });
+            ui.horizontal(|ui| {
                 ui.label("num segments");
                 let _resp = ui.add(
                     egui::DragValue::new(&mut self.num)
@@ -62,9 +81,16 @@ impl eframe::App for BezierCircleApproximation {
                 let _resp = ui.add(
                     egui::DragValue::new(&mut self.angle)
                         .speed(0.01)
-                        .range(0.1..=2.0 * PI)
+                        .range(0.1..=(2.0 * PI - 0.01))
                         .update_while_editing(false),
                 );
+                let full_circle_angle = 2.0 * PI / (self.num as f64);
+                if ui
+                    .button(format!("full circle {:.2}", full_circle_angle))
+                    .clicked()
+                {
+                    self.angle = full_circle_angle;
+                }
             });
         });
 
@@ -162,7 +188,7 @@ impl eframe::App for BezierCircleApproximation {
                             );
 
                             let bezier_length = bezier.arclen_castlejau(None);
-                            let num_t = ((bezier_length / 0.02) as usize).max(4);
+                            let num_t = ((bezier_length / 0.02) as usize).clamp(4, 256);
 
                             let mut bezier_pts = Vec::new();
                             let fr = 1.0 / num_t as f64;
@@ -280,6 +306,7 @@ impl BezierCircleApproximation {
             num: 4,
             angle: PI / 2.0,
             handle_length: 0.4,
+            going_to_optimal: false,
         })
     }
 }
