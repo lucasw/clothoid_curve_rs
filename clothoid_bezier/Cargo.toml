@@ -1,0 +1,20 @@
+[package]
+name = "clothoid_bezier"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.100"
+clothoid_curve = { path = "../clothoid_curve" }
+eframe = "0.31"
+egui = "0.31"
+egui_extras = { version = "0.31", features = ["all_loaders"] }
+egui_plot = "0.31"
+eval-metrics = "1.0.2"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.22"
+
+[dependencies.stroke]
+git = "https://github.com/lucasw/stroke"
+branch = "f32_or_f64_only"
+version = "0.6.1"

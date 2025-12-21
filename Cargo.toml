@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "clothoid_bezier",
   "clothoid_curve",
   "clothoid_curve_gui", "clothoid_util", "diff_drive", "test_no_std",
 ]
