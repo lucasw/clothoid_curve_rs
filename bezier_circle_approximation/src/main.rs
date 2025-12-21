@@ -19,6 +19,23 @@ struct BezierCircleApproximation {
     going_to_optimal: bool,
 }
 
+// TODO(lucasw) put in lib.rs, add unit tests
+/// https://stackoverflow.com/a/27863181/603653
+/// this will work poorly for small curvatures
+fn radius_to_bezier_handle_length(radius: f64, arc_angle: f64) -> f64 {
+    // TODO(lucasw) check if handle length is > arc_len / 2.0 or similar
+    // let arc_len = radius * arc_angle;
+    // let num = 2.0 * PI / arc_angle;
+    // radius * 4.0 / 3.0 * (PI / (2.0 * num)).tan()
+    radius * 4.0 / 3.0 * (arc_angle / 4.0).tan()
+}
+
+/*
+fn curvature_to_bezier_handle_length(curvature: f64, arc_angle: f64) -> f64 {
+    radius_to_bezier_handle_length(1.0 / curvature, arc_angle)
+}
+*/
+
 impl eframe::App for BezierCircleApproximation {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
         let mut bezier_distance = Vec::new();
@@ -40,9 +57,7 @@ impl eframe::App for BezierCircleApproximation {
                         .update_while_editing(false),
                 );
 
-                // https://stackoverflow.com/a/27863181/603653
-                let num = 2.0 * PI / self.angle;
-                let optimal_length = self.radius * 4.0 / 3.0 * (PI / (2.0 * num)).tan();
+                let optimal_length = radius_to_bezier_handle_length(self.radius, self.angle);
 
                 if ui
                     .button(format!("optimal {:.6}", optimal_length))
@@ -105,6 +120,7 @@ impl eframe::App for BezierCircleApproximation {
                     .legend(Legend::default())
                     .data_aspect(1.0)
                     .view_aspect(1.0)
+                    // .show_grid(false)
                     .show(ui, |plot_ui| {
                         let mut start_angle: f64 = 0.0;
                         let mut last_angle = None;
@@ -212,7 +228,13 @@ impl eframe::App for BezierCircleApproximation {
                                     }
                                 }
                                 let unwrapped_angle = angle + angle_offset;
-                                bezier_distance.push([unwrapped_angle, dist, self.radius]);
+                                let curvature = bezier.curvature(parametric_tfrac);
+                                bezier_distance.push([
+                                    unwrapped_angle,
+                                    dist,
+                                    self.radius,
+                                    curvature,
+                                ]);
                                 // info!("{angle:.3}, {dist:.3}");
                                 // how far it is from 1.0 is the bezier approximation error
                                 bezier_pts.push(pt);
@@ -256,6 +278,12 @@ impl eframe::App for BezierCircleApproximation {
                     .into_iter()
                     .map(|x| [x[0], x[1] - x[2]])
                     .collect();
+                let curvature_error: Vec<[f64; 2]> = bezier_distance
+                    .clone()
+                    .into_iter()
+                    .map(|x| [x[0], x[3] - 1.0 / x[2]])
+                    .collect();
+
                 egui_plot::Plot::new("error")
                     .auto_bounds(true)
                     .allow_double_click_reset(true)
@@ -268,7 +296,7 @@ impl eframe::App for BezierCircleApproximation {
                     .show(ui, |plot_ui| {
                         plot_ui.points(
                             Points::new(distance_error.clone())
-                                .name("error points")
+                                .name("distance error points")
                                 .allow_hover(false)
                                 .radius(2.5)
                                 .color(Color32::GOLD),
@@ -276,9 +304,16 @@ impl eframe::App for BezierCircleApproximation {
 
                         plot_ui.line(
                             Line::new(distance_error)
-                                .name("error")
+                                .name("distance error")
                                 .allow_hover(false)
                                 .stroke(Stroke::new(1.2, Color32::GOLD)),
+                        );
+
+                        plot_ui.line(
+                            Line::new(curvature_error)
+                                .name("curvature error")
+                                .allow_hover(false)
+                                .stroke(Stroke::new(1.2, Color32::PURPLE)),
                         );
                     });
             });
