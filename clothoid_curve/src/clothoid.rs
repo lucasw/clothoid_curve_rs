@@ -498,6 +498,11 @@ impl Clothoid {
         (x, y)
     }
 
+    pub fn get_xy_array(&self, s: f64) -> [f64; 2] {
+        let (x, y) = self.get_xy(s);
+        [x, y]
+    }
+
     /// get a new Clothoid at this location along the current one
     pub fn get_clothoid(&self, s: Float) -> Self {
         let (x_s, y_s) = self.get_xy(s);
@@ -506,20 +511,31 @@ impl Clothoid {
         let theta_s = self.theta0 + s * (self.kappa0 + 0.5 * s * self.dk);
         let kappa_s = self.kappa0 + s * self.dk; // curvature changes linearly with curvature_rate
 
+        // TODO(lucasw) just use the same length as starting clothoid, or set to self.length - s
+        // but only if s < self.length?
+        let length = self.length;
         Self {
             x0: x_s,
             y0: y_s,
             theta0: angle_unwrap(theta_s),
             kappa0: kappa_s,
             dk: self.dk, // curvature rate is constant through the clothoid segment
-            length: self.length, // TODO(lucasw) just use the same length as starting clothoid, or set to 1.0?
+            length,
         }
     }
 
-    pub fn get_points<const NUM: usize>(&self) -> [[Float; 2]; NUM] {
-        let mut xys = [[0.0; 2]; NUM];
+    pub fn get_end_clothoid(&self) -> Self {
+        self.get_clothoid(self.length)
+    }
 
-        let step = self.length / (NUM as Float);
+    pub fn get_points<const NUM: usize>(&self) -> [[Float; 2]; NUM] {
+        let mut xys = Vec::<[f64; 2]>::new();
+
+        if num == 0 {
+            num = 1;
+        }
+
+        let step = self.length / ((num - 1) as f64);
         let mut s = 0.0;
 
         for xys_i in xys.iter_mut().take(NUM) {
@@ -547,7 +563,7 @@ mod tests {
         let clothoid0 = Clothoid::create(0.0, 0.0, 0.0, curvature, 0.0, length);
 
         // sample the clothoid at the end
-        let clothoid1 = clothoid0.get_clothoid(length);
+        let clothoid1 = clothoid0.get_end_clothoid();
         // curvature_rate should not change
         assert!(clothoid0.curvature_rate() == clothoid1.curvature_rate());
 
