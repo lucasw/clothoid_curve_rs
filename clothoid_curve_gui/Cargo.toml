@@ -9,7 +9,7 @@ license = "BSD-3"
 [dependencies]
 clothoid_curve = {path="../clothoid_curve"}
 clothoid_util = { version = "0.1.0", path = "../clothoid_util" }
-eframe = "0.29.0"
-egui = "0.29.0"
-egui_plot = "0.29.0"
+eframe = { version = "0.31" }
+egui = "0.31"
+egui_plot = "0.31"
 env_logger = "0.11.2"

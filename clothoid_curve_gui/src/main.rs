@@ -230,6 +230,7 @@ impl eframe::App for PlotCurve {
                 .allow_drag(false)
                 .allow_scroll(false)
                 .legend(Legend::default())
+                .data_aspect(1.0)
                 .show(ui, |plot_ui| {
                     if let Some(mut scroll) = scroll {
                         if modifiers.ctrl == self.ctrl_to_zoom {
