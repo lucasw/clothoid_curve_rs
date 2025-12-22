@@ -29,10 +29,12 @@ struct ClothoidBezierApproximation {
     curvature: f64,
     curvature_rate: f64,
     length: f64,
-    // num: usize,
     handle_length0: f64,
     handle_length1: f64,
-    // going_to_optimal: bool,
+    // for animation
+    target_handle_length0: f64,
+    target_handle_length1: f64,
+    going_to_optimal: bool,
 }
 
 impl CostFunction for &ClothoidBezierApproximation {
@@ -114,7 +116,7 @@ impl ClothoidBezierApproximation {
 
         let length_delta = self.length - bezier.arclen(32);
 
-        let mut residual = delta0 * delta0 + delta1 * delta1 + length_delta * length_delta;
+        let mut residual = delta0 * delta0 + delta1 * delta1 + 0.1 * length_delta * length_delta;
 
         if handle_length0 < 0.0 {
             residual += -handle_length0;
@@ -210,47 +212,57 @@ impl eframe::App for ClothoidBezierApproximation {
 
             ui.horizontal(|ui| {
                 ui.label("bezier handle length");
-                let _resp = ui.add(
+                let resp = ui.add(
                     egui::DragValue::new(&mut self.handle_length0)
                         .speed(0.003)
                         .range(0.0..=5.0)
                         .update_while_editing(false),
                 );
+                if resp.clicked() {
+                    self.going_to_optimal = false;
+                }
 
-                let _resp = ui.add(
+                let resp = ui.add(
                     egui::DragValue::new(&mut self.handle_length1)
                         .speed(0.003)
                         .range(0.0..=5.0)
                         .update_while_editing(false),
                 );
+                if resp.clicked() {
+                    self.going_to_optimal = false;
+                }
 
                 if ui.button("find handles").clicked() {
                     let rv = self.find_handles();
                     if let Ok(handles) = rv {
                         // go to optimal in one step
-                        self.handle_length0 = handles.0;
-                        self.handle_length1 = handles.1;
-                        // self.going_to_optimal = true;
+                        // self.handle_length0 = handles.0;
+                        // self.handle_length1 = handles.1;
+                        self.target_handle_length0 = handles.0;
+                        self.target_handle_length1 = handles.1;
+                        self.going_to_optimal = true;
                     } else {
                         warn!("{rv:?}");
                     }
                 }
 
-                /*
                 if self.going_to_optimal {
                     // smoothly move towards optimal
                     // info!("pressed");
-                    let error = (optimal_length - self.handle_length).clamp(-0.015, 0.015);
-                    self.handle_length += error;
+                    let error0 =
+                        (self.target_handle_length0 - self.handle_length0).clamp(-0.015, 0.015);
+                    self.handle_length0 += error0;
+                    let error1 =
+                        (self.target_handle_length1 - self.handle_length1).clamp(-0.015, 0.015);
+                    self.handle_length1 += error1;
                     // if nothing changes won't get a repaint so won't get to optimal,
                     // so force a repaint so this keeps executing
-                    if error != 0.0 {
+                    if error0 != 0.0 || error1 != 0.0 {
                         ctx.request_repaint();
                     } else {
                         self.going_to_optimal = false;
                     }
                 }
-                */
             });
             /*
             ui.horizontal(|ui| {
@@ -454,9 +466,11 @@ impl ClothoidBezierApproximation {
             curvature: 1.0,
             curvature_rate: 0.0, // 1.275,
             length: PI / 2.0,
-            handle_length0: 0.4,
-            handle_length1: 0.4,
-            // going_to_optimal: false,
+            handle_length0: 0.0,
+            handle_length1: 0.0,
+            target_handle_length0: 0.4,
+            target_handle_length1: 0.4,
+            going_to_optimal: true,
         })
     }
 }
