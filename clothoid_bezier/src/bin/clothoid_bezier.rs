@@ -11,6 +11,19 @@ use egui_plot::{Legend, Line, Points};
 use std::f64::consts::PI;
 use stroke::f64::{CubicBezier, Point, PointN};
 // use tracing::{debug, error, info, warn};
+use tracing::{info, warn};
+
+#[allow(unused_imports)]
+use argmin::{
+    core::{CostFunction, Error, Executor, Gradient, observers::ObserverMode},
+    solver::{
+        gradientdescent::SteepestDescent,
+        linesearch::{HagerZhangLineSearch, MoreThuenteLineSearch},
+    },
+};
+#[allow(unused_imports)]
+use argmin_observer_slog::SlogLogger;
+use finitediff::FiniteDiff;
 
 struct ClothoidBezierApproximation {
     curvature: f64,
@@ -22,27 +35,151 @@ struct ClothoidBezierApproximation {
     // going_to_optimal: bool,
 }
 
-/*
-// TODO(lucasw) put in lib.rs, add unit tests
-/// https://stackoverflow.com/a/27863181/603653
-/// this will work poorly for small curvatures
-fn radius_to_bezier_handle_length(radius: f64, arc_angle: f64) -> f64 {
-    // TODO(lucasw) check if handle length is > arc_len / 2.0 or similar
-    // let arc_len = radius * arc_angle;
-    // let num = 2.0 * PI / arc_angle;
-    // radius * 4.0 / 3.0 * (PI / (2.0 * num)).tan()
-    radius * 4.0 / 3.0 * (arc_angle / 4.0).tan()
-}
-*/
+impl CostFunction for &ClothoidBezierApproximation {
+    type Param = Vec<f64>;
+    type Output = f64;
 
-/*
-fn curvature_to_bezier_handle_length(curvature: f64, arc_angle: f64) -> f64 {
-    radius_to_bezier_handle_length(1.0 / curvature, arc_angle)
+    fn cost(&self, p: &Self::Param) -> Result<Self::Output, Error> {
+        let handle_length0 = p[0];
+        let handle_length1 = p[1];
+        self.cost0(handle_length0, handle_length1)
+    }
 }
-*/
+
+impl Gradient for &ClothoidBezierApproximation {
+    type Param = Vec<f64>;
+    type Gradient = Vec<f64>;
+
+    fn gradient(&self, p: &Self::Param) -> Result<Self::Gradient, Error> {
+        // Ok(p.central_diff(&|x| self.cost(x).unwrap()))
+        Ok(p.forward_diff(&|x| self.cost(x).unwrap()))
+    }
+}
+
+impl ClothoidBezierApproximation {
+    fn to_clothoid(&self) -> Clothoid {
+        let x0 = 0.0;
+        let y0 = 0.0;
+        Clothoid::create(
+            x0,
+            y0,
+            0.0,
+            self.curvature,
+            self.curvature_rate,
+            self.length,
+        )
+    }
+
+    // TODO(lucasw) the handle lengths are also stored in self, but not altered by the fit function
+    fn get_bezier(
+        clothoid: &Clothoid,
+        handle_length0: f64,
+        handle_length1: f64,
+    ) -> CubicBezier<PointN<2>, 2> {
+        let clothoid_end = clothoid.get_end_clothoid();
+        // the bezier end points
+        let bz_pt0: [f64; 2] = [clothoid.x0, clothoid.y0];
+        let bz_pt3: [f64; 2] = [clothoid_end.x0, clothoid_end.y0];
+
+        // find where the handles are
+        let bz_angle0 = clothoid.theta0;
+        let bz_pt1 = [
+            bz_pt0[0] + handle_length0 * bz_angle0.cos(),
+            bz_pt0[1] + handle_length0 * bz_angle0.sin(),
+        ];
+
+        let bz_angle1 = clothoid_end.theta0;
+        let bz_pt2 = [
+            bz_pt3[0] - handle_length1 * bz_angle1.cos(),
+            bz_pt3[1] - handle_length1 * bz_angle1.sin(),
+        ];
+
+        CubicBezier::new(
+            PointN::new(bz_pt0),
+            PointN::new(bz_pt1),
+            PointN::new(bz_pt2),
+            PointN::new(bz_pt3),
+        )
+    }
+
+    fn cost0(&self, handle_length0: f64, handle_length1: f64) -> Result<f64, Error> {
+        let clothoid = self.to_clothoid();
+        let bezier = Self::get_bezier(&clothoid, handle_length0, handle_length1);
+        let curvature0 = clothoid.curvature();
+        let delta0 = curvature0 - bezier.curvature(0.0);
+
+        let clothoid_end = clothoid.get_end_clothoid();
+        let curvature1 = clothoid_end.curvature();
+        let delta1 = curvature1 - bezier.curvature(1.0);
+
+        let length_delta = self.length - bezier.arclen(32);
+
+        let mut residual = delta0 * delta0 + delta1 * delta1 + length_delta * length_delta;
+
+        if handle_length0 < 0.0 {
+            residual += -handle_length0;
+        }
+        if handle_length1 < 0.0 {
+            residual += -handle_length1;
+        }
+
+        /*
+        let max = self.length * 4.0;
+
+        let m0 = handle_length0 - max;
+        if m0 > 0.0 {
+            residual += m0;
+        }
+        let m1 = handle_length1 - max;
+        if m1 > 0.0 {
+            residual += m1;
+        }
+        info!("{handle_length0} {handle_length1} {residual}");
+        */
+        Ok(residual)
+    }
+
+    fn find_handles(&self) -> Result<(f64, f64), Error> {
+        let handle0_guess = self.handle_length0;
+        let handle1_guess = self.handle_length1;
+
+        let verbose = true;
+
+        let init_param: Vec<f64> = vec![handle0_guess, handle1_guess];
+        if verbose {
+            info!(
+                "initial cost {:?} -> {:?}",
+                init_param,
+                self.cost(&init_param)
+            );
+        }
+
+        // Pick a line search.
+        // let linesearch = HagerZhangLineSearch::new();
+        let linesearch = MoreThuenteLineSearch::new();
+        let solver = SteepestDescent::new(linesearch);
+
+        let res = Executor::new(self, solver)
+            .configure(|state| state.param(init_param).target_cost(0.001).max_iters(150))
+            // .add_observer(SlogLogger::term(), ObserverMode::Always)
+            .run()?;
+
+        // print result
+        if verbose {
+            info!("{res}");
+        }
+
+        let param = res.state.param.unwrap();
+        Ok((param[0], param[1]))
+    }
+}
 
 impl eframe::App for ClothoidBezierApproximation {
     fn update(&mut self, ctx: &egui::Context, _: &mut eframe::Frame) {
+        let clothoid = self.to_clothoid();
+        let num_pts = 2 * ((self.length * 5.0) as usize).clamp(4, 64);
+        let fr = 1.0 / (num_pts - 1) as f64;
+
         // let mut bezier_distance = Vec::new();
         TopBottomPanel::top("controls").show(ctx, |ui| {
             ui.horizontal(|ui| {
@@ -69,7 +206,9 @@ impl eframe::App for ClothoidBezierApproximation {
                         .range(0.1..=20.0)
                         .update_while_editing(false),
                 );
+            });
 
+            ui.horizontal(|ui| {
                 ui.label("bezier handle length");
                 let _resp = ui.add(
                     egui::DragValue::new(&mut self.handle_length0)
@@ -85,19 +224,19 @@ impl eframe::App for ClothoidBezierApproximation {
                         .update_while_editing(false),
                 );
 
-                /*
-                let optimal_length = radius_to_bezier_handle_length(self.radius, self.angle);
-
-                if ui
-                    .button(format!("optimal {:.6}", optimal_length))
-                    // .is_pointer_button_down_on()
-                    .clicked()
-                {
-                    // go to optimal in one step
-                    // self.handle_length = optimal_length;
-                    self.going_to_optimal = true;
+                if ui.button("find handles").clicked() {
+                    let rv = self.find_handles();
+                    if let Ok(handles) = rv {
+                        // go to optimal in one step
+                        self.handle_length0 = handles.0;
+                        self.handle_length1 = handles.1;
+                        // self.going_to_optimal = true;
+                    } else {
+                        warn!("{rv:?}");
+                    }
                 }
 
+                /*
                 if self.going_to_optimal {
                     // smoothly move towards optimal
                     // info!("pressed");
@@ -126,6 +265,11 @@ impl eframe::App for ClothoidBezierApproximation {
             */
         });
 
+        let bezier = ClothoidBezierApproximation::get_bezier(
+            &self.to_clothoid(),
+            self.handle_length0,
+            self.handle_length1,
+        );
         let mut bezier_distance = Vec::new();
         CentralPanel::default().show(ctx, |ui| {
             egui::Grid::new("grid").num_columns(1).show(ui, |ui| {
@@ -140,21 +284,7 @@ impl eframe::App for ClothoidBezierApproximation {
                     .view_aspect(1.0)
                     // .show_grid(false)
                     .show(ui, |plot_ui| {
-                        let x0 = 0.0;
-                        let y0 = 0.0;
-
-                        let num_pts = ((self.length * 10.0) as u32).clamp(4, 128);
-
-                        let clothoid = Clothoid::create(
-                            x0,
-                            y0,
-                            0.0,
-                            self.curvature,
-                            self.curvature_rate,
-                            self.length,
-                        );
-
-                        let clothoid_pts = clothoid.get_points(num_pts);
+                        let clothoid_pts = clothoid.get_points(num_pts as u32);
 
                         plot_ui.line(
                             Line::new(clothoid_pts.clone())
@@ -171,31 +301,10 @@ impl eframe::App for ClothoidBezierApproximation {
                                 .color(Color32::CYAN),
                         );
 
-                        let clothoid_end = clothoid.get_end_clothoid();
-                        // the bezier end points
-                        let bz_pt0: [f64; 2] = [clothoid.x0, clothoid.y0];
-                        let bz_pt3: [f64; 2] = [clothoid_end.x0, clothoid_end.y0];
-
-                        // find where the handles are
-                        let bz_angle0 = clothoid.theta0;
-                        let bz_pt1 = [
-                            bz_pt0[0] + self.handle_length0 * bz_angle0.cos(),
-                            bz_pt0[1] + self.handle_length0 * bz_angle0.sin(),
-                        ];
-
-                        let bz_angle1 = clothoid_end.theta0;
-                        let bz_pt2 = [
-                            bz_pt3[0] - self.handle_length1 * bz_angle1.cos(),
-                            bz_pt3[1] - self.handle_length1 * bz_angle1.sin(),
-                        ];
-
-                        let bezier: CubicBezier<PointN<2>, 2> = CubicBezier::new(
-                            PointN::new(bz_pt0),
-                            PointN::new(bz_pt1),
-                            PointN::new(bz_pt2),
-                            PointN::new(bz_pt3),
-                        );
-
+                        let bz_pt0 = [bezier.start.axis(0), bezier.start.axis(1)];
+                        let bz_pt1 = [bezier.ctrl1.axis(0), bezier.ctrl1.axis(1)];
+                        let bz_pt2 = [bezier.ctrl2.axis(0), bezier.ctrl2.axis(1)];
+                        let bz_pt3 = [bezier.end.axis(0), bezier.end.axis(1)];
                         plot_ui.line(
                             Line::new(vec![bz_pt0, bz_pt1])
                                 .name("handle")
@@ -220,7 +329,6 @@ impl eframe::App for ClothoidBezierApproximation {
 
                         // TODO(lucasw) add this to stroke 'get_euclidean_pts(num)'
                         let bezier_length = bezier.arclen_castlejau(None);
-                        let fr = 1.0 / (num_pts - 1) as f64;
 
                         let mut bezier_pts = Vec::new();
                         for i in 0..num_pts {
@@ -343,8 +451,8 @@ impl eframe::App for ClothoidBezierApproximation {
 impl ClothoidBezierApproximation {
     fn new(_cc: &eframe::CreationContext<'_>) -> Result<Self, anyhow::Error> {
         Ok(ClothoidBezierApproximation {
-            curvature: 0.0,
-            curvature_rate: 1.275,
+            curvature: 1.0,
+            curvature_rate: 0.0, // 1.275,
             length: PI / 2.0,
             handle_length0: 0.4,
             handle_length1: 0.4,
@@ -369,7 +477,7 @@ fn main() -> Result<(), anyhow::Error> {
         ..Default::default()
     };
     let _ = eframe::run_native(
-        "Bezier Circle Approximation",
+        "Clothoid Bezier Approximation",
         options,
         Box::new(|cc| Ok(Box::new(ClothoidBezierApproximation::new(cc)?))),
     );
