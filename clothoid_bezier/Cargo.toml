@@ -11,8 +11,6 @@ argmin_fit = ["argmin", "argmin-math", "argmin-observer-slog", "finitediff"]
 anyhow.workspace = true
 clothoid_curve = { path = "../clothoid_curve" }
 eval-metrics = "1.0.2"
-tracing.workspace = true
-tracing-subscriber.workspace = true
 
 argmin = { version = "0.10.0", optional = true }
 argmin-math = { version = "0.4.0", optional = true }

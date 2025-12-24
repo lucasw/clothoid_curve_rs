@@ -1,7 +1,5 @@
 // Lucas Walter
 // December 2025
-// use tracing::{debug, error, info, warn};
-use tracing::info;
 
 #[cfg(feature = "argmin_fit")]
 #[allow(unused_imports)]
@@ -142,11 +140,13 @@ impl ClothoidBezierApproximation {
 
         let init_param: Vec<NativeFloat> = vec![handle0_guess, handle1_guess];
         if verbose {
+            /*
             info!(
                 "initial cost {:?} -> {:?}",
                 init_param,
                 self.cost(&init_param)
             );
+            */
         }
 
         // Pick a line search.
@@ -161,7 +161,9 @@ impl ClothoidBezierApproximation {
 
         // print result
         if verbose {
+            /*
             info!("{res}");
+            */
         }
 
         let param = res.state.param.unwrap();

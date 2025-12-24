@@ -5,7 +5,6 @@ December 2025
 
 show how well a set of bezier curves can approximate a clothoid curve
 */
-// use tracing::{debug, error, info, warn};
 
 use tinyvec::ArrayVec;
 // export common types at crate root
