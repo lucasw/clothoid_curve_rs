@@ -498,7 +498,7 @@ impl Clothoid {
         (x, y)
     }
 
-    pub fn get_xy_array(&self, s: f64) -> [f64; 2] {
+    pub fn get_xy_array(&self, s: Float) -> [Float; 2] {
         let (x, y) = self.get_xy(s);
         [x, y]
     }
@@ -529,16 +529,32 @@ impl Clothoid {
     }
 
     pub fn get_points<const NUM: usize>(&self) -> [[Float; 2]; NUM] {
-        let mut xys = Vec::<[f64; 2]>::new();
+        let mut xys = [[0.0; 2]; NUM];
+
+        let step = self.length / ((NUM - 1) as Float);
+        let mut s = 0.0;
+
+        for xys_i in xys.iter_mut().take(NUM) {
+            let xy = self.get_xy(s);
+            // println!("{:0.2} {:?}", s, xy);
+            *xys_i = [xy.0, xy.1];
+            s += step;
+        }
+
+        xys
+    }
+
+    pub fn get_points_num(&self, mut num: usize) -> Vec<[Float; 2]> {
+        let mut xys = Vec::<[Float; 2]>::new();
 
         if num == 0 {
             num = 1;
         }
 
-        let step = self.length / ((num - 1) as f64);
+        let step = self.length / ((num - 1) as Float);
         let mut s = 0.0;
 
-        for xys_i in xys.iter_mut().take(NUM) {
+        for xys_i in xys.iter_mut().take(num) {
             let xy = self.get_xy(s);
             // println!("{:0.2} {:?}", s, xy);
             *xys_i = [xy.0, xy.1];

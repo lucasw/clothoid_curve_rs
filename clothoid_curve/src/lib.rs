@@ -1,4 +1,5 @@
-#![no_std]
+// TODO(lucasw) restore the ability to compile to no_std, make it optional
+// #![no_std]
 
 pub mod f32 {
     pub type Float = f32;
