@@ -5,11 +5,10 @@ December 2025
 
 show how well a set of bezier curves can approximate a clothoid curve
 */
-use clothoid_bezier::ClothoidBezierApproximation;
+use clothoid_bezier::f64::{ClothoidBezierApproximation, Point};
 use egui::{CentralPanel, Color32, Stroke, TopBottomPanel};
 use egui_plot::{Legend, Line, Points};
 use std::f64::consts::PI;
-use stroke::f64::Point;
 // use tracing::{debug, error, info, warn};
 use tracing::warn;
 
