@@ -20,7 +20,7 @@ pub struct CubicBezier<P, const PDIM: usize> {
 }
 
 // TODO(lucasw) can I avoid the redundant sizes?
-// CubicBezier::<PointN<f64, 2>, 2>
+pub type CubicBezier2 = CubicBezier::<PointN<2>, 2>;
 
 //#[allow(dead_code)]
 impl<P, const PDIM: usize> CubicBezier<P, PDIM>
@@ -582,26 +582,25 @@ mod tests {
         let max_drift_perc = 0.019608; // radial drift percent
         let max_error = max_drift_perc * 0.011; // absolute max radial error
 
-        const PDIM: usize = 2;
-        let bezier_quadrant_1 = CubicBezier::<_, PDIM> {
+        let bezier_quadrant_1 = CubicBezier2 {
             start: PointN::new([0.0, 1.0]),
             ctrl1: PointN::new([c, 1.0]),
             ctrl2: PointN::new([1.0, c]),
             end: PointN::new([1.0, 0.0]),
         };
-        let bezier_quadrant_2 = CubicBezier::<_, PDIM> {
+        let bezier_quadrant_2 = CubicBezier2 {
             start: PointN::new([1.0, 0.0]),
             ctrl1: PointN::new([1.0, -c]),
             ctrl2: PointN::new([c, -1.0]),
             end: PointN::new([0.0, -1.0]),
         };
-        let bezier_quadrant_3 = CubicBezier::<_, PDIM> {
+        let bezier_quadrant_3 = CubicBezier2 {
             start: PointN::new([0.0, -1.0]),
             ctrl1: PointN::new([-c, -1.0]),
             ctrl2: PointN::new([-1.0, -c]),
             end: PointN::new([-1.0, 0.0]),
         };
-        let bezier_quadrant_4 = CubicBezier::<_, PDIM> {
+        let bezier_quadrant_4 = CubicBezier2 {
             start: PointN::new([-1.0, 0.0]),
             ctrl1: PointN::new([-1.0, c]),
             ctrl2: PointN::new([-c, 1.0]),

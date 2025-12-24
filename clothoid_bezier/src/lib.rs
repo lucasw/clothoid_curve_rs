@@ -6,7 +6,6 @@ December 2025
 show how well a set of bezier curves can approximate a clothoid curve
 */
 // use tracing::{debug, error, info, warn};
-use tracing::info;
 
 use tinyvec::ArrayVec;
 // export common types at crate root
@@ -44,7 +43,7 @@ pub mod f32 {
         include!("roots.rs");
     }
 
-    pub use cubic_bezier::CubicBezier;
+    pub use cubic_bezier::CubicBezier2;
     pub use line::LineSegment;
     pub use point::Point;
     pub use point::PointN;
@@ -82,7 +81,7 @@ pub mod f64 {
         include!("roots.rs");
     }
 
-    pub use cubic_bezier::CubicBezier;
+    pub use cubic_bezier::CubicBezier2;
     pub use line::LineSegment;
     pub use point::Point;
     pub use point::PointN;

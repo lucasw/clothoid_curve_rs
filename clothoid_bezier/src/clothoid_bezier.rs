@@ -62,7 +62,7 @@ impl ClothoidBezierApproximation {
         clothoid: &Clothoid,
         handle_length0: NativeFloat,
         handle_length1: NativeFloat,
-    ) -> CubicBezier<PointN<2>, 2> {
+    ) -> CubicBezier2 {
         let clothoid_end = clothoid.get_end_clothoid();
         // the bezier end points
         let bz_pt0: [NativeFloat; 2] = [clothoid.x0, clothoid.y0];
@@ -81,7 +81,7 @@ impl ClothoidBezierApproximation {
             bz_pt3[1] - handle_length1 * bz_angle1.sin(),
         ];
 
-        CubicBezier::new(
+        CubicBezier2::new(
             PointN::new(bz_pt0),
             PointN::new(bz_pt1),
             PointN::new(bz_pt2),
