@@ -1,9 +1,9 @@
 // Lucas Walter
 // December 2025
-use clothoid_curve::f64::Clothoid;
 // use tracing::{debug, error, info, warn};
 use tracing::info;
 
+#[cfg(feature = "argmin_fit")]
 #[allow(unused_imports)]
 use argmin::{
     core::{CostFunction, Error, Executor, Gradient, observers::ObserverMode},
@@ -12,8 +12,10 @@ use argmin::{
         linesearch::{HagerZhangLineSearch, MoreThuenteLineSearch},
     },
 };
+#[cfg(feature = "argmin_fit")]
 #[allow(unused_imports)]
 use argmin_observer_slog::SlogLogger;
+#[cfg(feature = "argmin_fit")]
 use finitediff::FiniteDiff;
 
 /// approximate a clothoid with a cubic bezier
@@ -23,6 +25,7 @@ pub struct ClothoidBezierApproximation {
     pub length: NativeFloat,
 }
 
+#[cfg(feature = "argmin_fit")]
 impl CostFunction for &ClothoidBezierApproximation {
     type Param = Vec<NativeFloat>;
     type Output = NativeFloat;
@@ -34,6 +37,7 @@ impl CostFunction for &ClothoidBezierApproximation {
     }
 }
 
+#[cfg(feature = "argmin_fit")]
 impl Gradient for &ClothoidBezierApproximation {
     type Param = Vec<NativeFloat>;
     type Gradient = Vec<NativeFloat>;
@@ -89,6 +93,7 @@ impl ClothoidBezierApproximation {
         )
     }
 
+    #[cfg(feature = "argmin_fit")]
     fn cost0(&self, handle_length0: NativeFloat, handle_length1: NativeFloat) -> Result<NativeFloat, Error> {
         let clothoid = self.to_clothoid();
         let bezier = Self::get_bezier(&clothoid, handle_length0, handle_length1);
@@ -126,6 +131,8 @@ impl ClothoidBezierApproximation {
         Ok(residual)
     }
 
+    // TODO(lucasw) maybe argmin can be no_std
+    #[cfg(feature = "argmin_fit")]
     pub fn find_handles(
         &self,
         handle0_guess: NativeFloat,

@@ -1,6 +1,6 @@
 [package]
 name = "clothoid_curve_gui"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 repository = "https://github.com/lucasw/clothoid_curve_rs"
 readme = "../README.md"
@@ -8,9 +8,9 @@ license = "BSD-3"
 
 [dependencies]
 anyhow = "1.0.100"
-clothoid_bezier = { version = "0.1.0", path = "../clothoid_bezier" }
-clothoid_curve = {path="../clothoid_curve"}
-clothoid_util = { version = "0.1.0", path = "../clothoid_util" }
+clothoid_bezier = { path = "../clothoid_bezier" }
+clothoid_curve = { path = "../clothoid_curve" }
+clothoid_util = { path = "../clothoid_util" }
 eframe = { version = "0.31" }
 egui = "0.31"
 egui_plot = "0.31"

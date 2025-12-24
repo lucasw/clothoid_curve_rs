@@ -48,6 +48,10 @@ pub mod f32 {
     pub use point::Point;
     pub use point::PointN;
     pub use quadratic_bezier::QuadraticBezier;
+
+    use clothoid_curve::f32::Clothoid;
+    // TODO(lucasw) the argmin stuff doesn't work with f32, make it only use f64
+    // include!("clothoid_bezier.rs");
 }
 
 pub mod f64 {
@@ -87,6 +91,7 @@ pub mod f64 {
     pub use point::PointN;
     pub use quadratic_bezier::QuadraticBezier;
 
+    use clothoid_curve::f64::Clothoid;
     // pub mod clothoid_bezier {
         include!("clothoid_bezier.rs");
     // }

@@ -3,6 +3,10 @@ name = "clothoid_bezier"
 version.workspace = true
 edition = "2024"
 
+[features]
+default = ["argmin_fit"]
+argmin_fit = ["argmin", "argmin-math", "argmin-observer-slog", "finitediff"]
+
 [dependencies]
 anyhow.workspace = true
 clothoid_curve = { path = "../clothoid_curve" }
@@ -10,11 +14,11 @@ eval-metrics = "1.0.2"
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
-argmin = "0.10.0"
-argmin-math = "0.4.0"
-argmin-observer-slog = "0.1.0"
+argmin = { version = "0.10.0", optional = true }
+argmin-math = { version = "0.4.0", optional = true }
+argmin-observer-slog = { version = "0.1.0", optional = true }
 # env_logger = "0.11.2"
-finitediff = "0.1.4"
+finitediff = { version = "0.1.4", optional = true }
 tinyvec = "1.10.0"
 libm = "0.2.15"
 

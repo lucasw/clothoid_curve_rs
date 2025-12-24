@@ -4,4 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+clothoid_bezier = { path = "../clothoid_bezier", default-features = true }
 clothoid_curve = { path = "../clothoid_curve", default-features = false }
