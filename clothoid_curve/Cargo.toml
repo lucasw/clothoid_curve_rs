@@ -7,6 +7,9 @@ readme = "../README.md"
 license = "BSD-3"
 
 [features]
+default = ["std"]
+std = []
 
 [dependencies]
+# TODO(lucasw) only use libm when no using std
 libm = "0.2.8"

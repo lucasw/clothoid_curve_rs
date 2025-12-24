@@ -1,4 +1,4 @@
-// TODO(lucasw) restore the ability to compile to no_std, make it optional
+// this doesn't have to be no_std, but with no-default-features it should be no_std compatible
 // #![no_std]
 
 pub mod f32 {

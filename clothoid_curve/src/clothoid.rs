@@ -544,6 +544,7 @@ impl Clothoid {
         xys
     }
 
+    #[cfg(feature = "std")]
     pub fn get_points_num(&self, mut num: usize) -> Vec<[Float; 2]> {
         let mut xys = Vec::<[Float; 2]>::new();
 
