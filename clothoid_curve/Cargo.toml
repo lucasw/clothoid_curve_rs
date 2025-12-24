@@ -1,6 +1,6 @@
 [package]
 name = "clothoid_curve"
-version = "0.3.0"
+version.workspace = true
 edition = "2021"
 repository = "https://github.com/lucasw/clothoid_curve_rs"
 readme = "../README.md"
