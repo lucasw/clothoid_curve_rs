@@ -144,7 +144,7 @@ impl eframe::App for ClothoidToBezier {
                     .view_aspect(1.0)
                     // .show_grid(false)
                     .show(ui, |plot_ui| {
-                        let clothoid_pts = clothoid.get_points(num_pts as u32);
+                        let clothoid_pts = clothoid.get_points_num(num_pts);
 
                         plot_ui.line(
                             Line::new(clothoid_pts.clone())

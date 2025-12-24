@@ -1,6 +1,6 @@
 // Lucas Walter
 // December 2025
-use clothoid_curve::clothoid::Clothoid;
+use clothoid_curve::f64::Clothoid;
 // use tracing::{debug, error, info, warn};
 use tracing::info;
 
