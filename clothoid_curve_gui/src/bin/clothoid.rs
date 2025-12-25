@@ -81,6 +81,10 @@ struct PlotCurve {
     curve_solution: Clothoid,
     target_sender: Sender<Target>,
     solution_receiver: Receiver<Clothoid>,
+
+    mouse_point: [f64; 2],
+    curve_point_closest: [f64; 2],
+    curve_s_closest: f64,
 }
 
 impl PlotCurve {
@@ -104,6 +108,9 @@ impl PlotCurve {
             curve_solution: Clothoid::default(),
             target_sender,
             solution_receiver,
+            curve_point_closest: [0.0, 0.0],
+            curve_s_closest: 0.0,
+            mouse_point: [0.0, 0.0],
         }
     }
 }
@@ -225,7 +232,19 @@ impl eframe::App for PlotCurve {
 
             ui.label("Show a clothoid curve according to input controls, and also attempt to solve for desired curve end point angle and curvature given input curve initial conditions and only varying length and curvature_rate");
 
-            egui_plot::Plot::new("plot")
+            let curve = Clothoid::create(
+                self.x0,
+                self.y0,
+                self.theta0,
+                self.kappa0,
+                self.dk,
+                self.length,
+            );
+
+            (self.curve_point_closest, self.curve_s_closest) = curve.get_nearest(self.mouse_point, self.curve_s_closest);
+            ui.label(format!("Cursor position: x={:.1}, y={:.1}, {:?} {:.3}", self.mouse_point[0], self.mouse_point[1], self.curve_point_closest, self.curve_s_closest));
+
+            let plot = egui_plot::Plot::new("plot")
                 .allow_zoom(false)
                 .allow_drag(false)
                 .allow_scroll(false)
@@ -270,16 +289,6 @@ impl eframe::App for PlotCurve {
                         }
                         plot_ui.translate_bounds(pointer_translate);
                     }
-
-                    let curve = Clothoid::create(
-                        self.x0,
-                        self.y0,
-                        self.theta0,
-                        self.kappa0,
-                        self.dk,
-                        self.length,
-                    );
-
                     {
                         // const num = std::cmp::max(100, (50.0 * self.length) as u32);
                         const NUM: usize = 100;
@@ -305,7 +314,7 @@ impl eframe::App for PlotCurve {
                     }
 
                     // println!("sending new target {} {}", self.target_theta, self.target_kappa);
-                    let _rv = self.target_sender.send((curve, self.target_theta, self.target_kappa));
+                    let _rv = self.target_sender.send((curve.clone(), self.target_theta, self.target_kappa));
                     // println!("{rv:?}");
 
                     while let Ok(new_solution) = self.solution_receiver.try_recv() {
@@ -320,6 +329,11 @@ impl eframe::App for PlotCurve {
 
                     let solution_curve_points = PlotPoints::new(xys_b);
                     plot_ui.line(Line::new(solution_curve_points).name("Solution Curve").style(LineStyle::dotted_loose()));
+
+                    if let Some(pos) = plot_ui.pointer_coordinate() {
+                        self.mouse_point = [pos.x as f64, pos.y as f64];
+                    }
+                    plot_ui.line(Line::new(vec![self.mouse_point, self.curve_point_closest]).name("closest point").style(LineStyle::dotted_loose()));
                 });
         });
     }

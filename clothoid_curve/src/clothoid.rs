@@ -575,6 +575,54 @@ impl Clothoid {
 
         xys
     }
+
+    fn dist_sq(p0: [Float; 2], p1: [Float; 2]) -> Float {
+        let dx = p1[0] - p0[0];
+        let dy = p1[1] - p0[1];
+        dx * dx + dy * dy
+    }
+
+    /// TODO(lucasw) replace with more efficient search- argmin isn't no_std though
+    /// find the nearest point on the clothoid to the provided point
+    /// s0 initial position on curve to start searching from
+    /// return the s & xy location
+    pub fn get_nearest(&self, pt: [Float; 2], s0: Float) -> ([Float; 2], Float) {
+        let num = 16;
+        let step = self.length / (4.0 * num as Float);
+        let (_p_min, s) = self.get_nearest_with_step(pt, s0, step, num);
+        self.get_nearest_with_step(pt, s, step / (num as Float), num)
+    }
+
+    pub fn get_nearest_with_step(&self, pt: [Float; 2], s0: Float, fr: Float, num: usize) -> ([Float; 2], Float) {
+        let p0 = self.get_xy_array(s0);
+        let dist_sq0 = Self::dist_sq(pt, p0);
+        let mut dist_sq_min = dist_sq0;
+        let mut p_min = p0;
+        let mut s_min = s0;
+
+        // search a little ways in both directions
+        for step in [-fr, fr] {
+            let mut s = s0;
+            for _ in 0..num {
+                s += step;
+                if s < 0.0 || s > self.length {
+                    break;
+                }
+                let p = self.get_xy_array(s);
+                let dist_sq = Self::dist_sq(pt, p);
+                if dist_sq < dist_sq_min {
+                    dist_sq_min = dist_sq;
+                    p_min = p;
+                    s_min = s;
+                    // TODO(lucasw) give up if less than tolerance improvement
+                } else {
+                    break;
+                }
+            }
+        }
+
+        (p_min, s_min)
+    }
 }
 
 #[cfg(test)]
