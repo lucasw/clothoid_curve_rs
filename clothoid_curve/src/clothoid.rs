@@ -10,10 +10,21 @@ pub type Float = f64;
 use std::f64::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
 */
 
+use core::clone::Clone;
+use core::cmp::PartialEq;
+use core::iter::Iterator;
+use core::default::Default;
+use core::prelude::rust_2024::derive;
+
 /// put angle into -pi, pi range
 pub fn angle_unwrap(angle_radians: Float) -> Float {
     (angle_radians + PI) % (2.0 * PI) - PI
 }
+
+#[cfg(feature = "std")]
+extern crate alloc;
+#[cfg(feature = "std")]
+use alloc::vec::Vec;
 
 #[derive(Clone, PartialEq)]
 pub struct Clothoid {

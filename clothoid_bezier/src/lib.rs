@@ -5,6 +5,7 @@ December 2025
 
 show how well a set of bezier curves can approximate a clothoid curve
 */
+#![no_std]
 
 use tinyvec::ArrayVec;
 // export common types at crate root
@@ -20,6 +21,7 @@ pub mod f32 {
     use libm::acosf as acos;
     use libm::cosf as cos;
     use libm::powf as pow;
+    // use libm::sinf as sin;
     use libm::sqrtf as sqrt;
 
     // specialized types
@@ -48,8 +50,8 @@ pub mod f32 {
     pub use point::PointN;
     pub use quadratic_bezier::QuadraticBezier;
 
-    use clothoid_curve::f32::Clothoid;
     // TODO(lucasw) the argmin stuff doesn't work with f32, make it only use f64
+    // use clothoid_curve::f32::Clothoid;
     // include!("clothoid_bezier.rs");
 }
 
@@ -62,6 +64,7 @@ pub mod f64 {
     use libm::acos;
     use libm::cos;
     use libm::pow;
+    use libm::sin;
     use libm::sqrt;
 
     // specialized types

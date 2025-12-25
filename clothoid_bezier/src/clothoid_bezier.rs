@@ -24,6 +24,13 @@ pub struct ClothoidBezierApproximation {
 }
 
 #[cfg(feature = "argmin_fit")]
+extern crate alloc;
+#[cfg(feature = "argmin_fit")]
+use alloc::vec::Vec;
+#[cfg(feature = "argmin_fit")]
+use alloc::vec;
+
+#[cfg(feature = "argmin_fit")]
 impl CostFunction for &ClothoidBezierApproximation {
     type Param = Vec<NativeFloat>;
     type Output = NativeFloat;
@@ -73,14 +80,14 @@ impl ClothoidBezierApproximation {
         // find where the handles are
         let bz_angle0 = clothoid.theta0;
         let bz_pt1 = [
-            bz_pt0[0] + handle_length0 * bz_angle0.cos(),
-            bz_pt0[1] + handle_length0 * bz_angle0.sin(),
+            bz_pt0[0] + handle_length0 * cos(bz_angle0),
+            bz_pt0[1] + handle_length0 * sin(bz_angle0),
         ];
 
         let bz_angle1 = clothoid_end.theta0;
         let bz_pt2 = [
-            bz_pt3[0] - handle_length1 * bz_angle1.cos(),
-            bz_pt3[1] - handle_length1 * bz_angle1.sin(),
+            bz_pt3[0] - handle_length1 * cos(bz_angle1),
+            bz_pt3[1] - handle_length1 * sin(bz_angle1),
         ];
 
         CubicBezier2::new(

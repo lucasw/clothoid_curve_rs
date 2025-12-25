@@ -1,7 +1,10 @@
 // this doesn't have to be no_std, but with no-default-features it should be no_std compatible
-// #![no_std]
+#![no_std]
 
+use core::include;
 pub mod f32 {
+    use super::*;
+
     pub type Float = f32;
     use core::f32::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
     use libm::cosf as cos;
@@ -13,6 +16,8 @@ pub mod f32 {
 }
 
 pub mod f64 {
+    use super::*;
+
     pub type Float = f64;
     use core::f64::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
     use libm::cos;
