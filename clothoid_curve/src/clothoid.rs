@@ -566,10 +566,10 @@ impl Clothoid {
         let step = self.length / ((num - 1) as Float);
         let mut s = 0.0;
 
-        for xys_i in xys.iter_mut().take(num) {
+        for _ in 0..num {
             let xy = self.get_xy(s);
             // println!("{:0.2} {:?}", s, xy);
-            *xys_i = [xy.0, xy.1];
+            xys.push([xy.0, xy.1]);
             s += step;
         }
 
@@ -582,6 +582,30 @@ mod tests {
     extern crate std;
     use super::*;
     use std::format;
+
+    #[test]
+    fn get_points() {
+        let curvature = 1.0;
+        let length = PI / (curvature * 2.0);
+        let c0 = Clothoid::create(0.0, 0.0, 0.0, curvature, 0.0, length);
+
+        const NUM: usize = 32;
+        let pts0 = c0.get_points::<NUM>();
+        assert_eq!(pts0.len(), NUM);
+
+        #[cfg(feature = "std")]
+        {
+            let pts1 = c0.get_points_num(NUM);
+            assert_eq!(pts1.len(), NUM);
+
+            for i in 0..NUM {
+                let p0 = pts0[i];
+                let p1 = pts1[i];
+                assert_eq!(p0[0], p1[0]);
+                assert_eq!(p0[1], p1[1]);
+            }
+        }
+    }
 
     #[test]
     fn curvatures() {
