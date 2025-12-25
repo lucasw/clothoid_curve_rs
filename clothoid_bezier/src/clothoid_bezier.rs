@@ -177,3 +177,34 @@ impl ClothoidBezierApproximation {
         Ok((param[0], param[1]))
     }
 }
+
+#[cfg(test)]
+mod clothoid_bezier_tests {
+    use super::*;
+
+    #[cfg(feature = "argmin_fit")]
+    #[test]
+    fn test_circle_fit() {
+        for radius in [0.5, 1.0, 1.2] {
+            let cba = ClothoidBezierApproximation {
+                curvature: 1.0 / radius,
+                curvature_rate: 0.0,
+                length: radius * PI / 2.0,
+            };
+
+            // TODO(lucasw) this fails if too high or too low
+            let scs = [0.45, 0.5, 0.6, 0.7, 0.8, 1.0];
+            for sc0 in &scs {
+                for sc1 in &scs {
+                    let handle0_guess = radius * sc0;
+                    let handle1_guess = radius * sc1;
+                    let (handle0, handle1) = cba.find_handles(handle0_guess, handle1_guess).unwrap();
+                    let expected = radius * 0.55;
+                    let threshold = 0.02 * radius;
+                    assert!((handle0 - expected).abs() < threshold, "sc {sc0}, r {radius}, guess {handle0_guess} -> {handle0} {expected}");
+                    assert!((handle1 - expected).abs() < threshold, "sc {sc1}, r {radius}, guess {handle1_guess} -> {handle1} {expected}");
+                }
+            }
+        }
+    }
+}

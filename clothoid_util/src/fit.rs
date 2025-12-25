@@ -13,9 +13,9 @@ use argmin::{
         linesearch::{HagerZhangLineSearch, MoreThuenteLineSearch},
     },
 };
-use clothoid_curve::f64::{Clothoid, angle_unwrap};
 #[allow(unused_imports)]
 use argmin_observer_slog::SlogLogger;
+use clothoid_curve::f64::{Clothoid, angle_unwrap};
 use finitediff::FiniteDiff;
 
 #[derive(Clone)]
