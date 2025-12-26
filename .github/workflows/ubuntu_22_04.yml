@@ -33,6 +33,7 @@ jobs:
           rustc --version
           rustup target list | grep installed
 
+          sudo apt-get install gcc-aarch64-linux-gnu
           sudo apt-get install -yqq mingw-w64
 
       - name: cargo fmt
