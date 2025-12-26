@@ -1,0 +1,61 @@
+name: Build with Ubuntu 22.04
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+
+  ubuntu_22_04:
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+
+    steps:
+
+      - name: git clone this
+        uses: actions/checkout@v4
+        with:
+          path: clothoid_curve_rs
+
+      - name: install rust
+        run: |
+          # get the latest rust
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          PATH="$HOME/.cargo/bin:${PATH}"
+          rustup update
+          cargo --version
+          rustup target add x86_64-pc-windows-gnu
+          rustup target add aarch64-unknown-linux-gnu
+
+          cargo --version
+          rustc --version
+          rustup target list | grep installed
+
+          apt-get install -yqq mingw-w64
+
+      - name: cargo fmt
+        run: |
+          cd clothoid_curve_rs
+          cargo fmt --check
+
+      - name: cargo clippy
+        run: |
+          cd clothoid_curve_rs
+          cargo clippy
+
+      - name: cargo build
+        run: |
+          cd clothoid_curve_rs
+          cargo build
+
+      - name: cargo build windows
+        run: |
+          cd clothoid_curve_rs
+          cargo build --target x86_64-pc-windows-gnu
+
+      - name: cargo build arm
+        run: |
+          cd clothoid_curve_rs
+          cargo build --target aarch64-unknown-linux-gnu
