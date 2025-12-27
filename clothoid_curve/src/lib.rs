@@ -12,6 +12,8 @@ pub mod f32 {
     use libm::sinf as sin;
     use libm::sqrtf as sqrt;
 
+    use uom::si::f32::{Angle, Area, Length, ReciprocalLength, V};
+
     include!("clothoid.rs");
 }
 
@@ -24,6 +26,8 @@ pub mod f64 {
     use libm::floor;
     use libm::sin;
     use libm::sqrt;
+
+    use uom::si::f64::{Angle, Area, Length, ReciprocalLength, V};
 
     /*
     use std::fmt;
