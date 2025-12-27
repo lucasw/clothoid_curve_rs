@@ -16,9 +16,18 @@ use core::iter::Iterator;
 use core::default::Default;
 use core::prelude::rust_2024::derive;
 
+use typenum::{N2, Z0};
+use uom::Kind;
+use uom::num_traits::Zero;
+use uom::si::{
+    ISQ, Quantity, SI,
+    angle::radian,
+    length::meter,
+};
+
 /// put angle into -pi, pi range
-pub fn angle_unwrap(angle_radians: Float) -> Float {
-    (angle_radians + PI) % (2.0 * PI) - PI
+pub fn angle_unwrap(angle: Angle) -> Angle {
+    Angle::new::<radian>((angle.get::<radian>() + PI) % (2.0 * PI) - PI)
 }
 
 #[cfg(feature = "std")]
@@ -26,28 +35,51 @@ extern crate alloc;
 #[cfg(feature = "std")]
 use alloc::vec::Vec;
 
+/*
+dimension: ISQ<
+        N1,     // length
+        Z0,     // mass
+        Z0,     // time
+        Z0,     // electric current
+        Z0,     // thermodynamic temperature
+        Z0,     // amount of substance
+        Z0>;    // luminous intensity
+*/
+type ReciprocalArea = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
+
+#[derive(Clone, Default, PartialEq)]
+pub struct Position {
+    pub x: Length,
+    pub y: Length,
+}
+
 #[derive(Clone, PartialEq)]
 pub struct Clothoid {
-    pub x0: Float,     // start point x
-    pub y0: Float,     // start point y
-    pub theta0: Float, // start point theta/yaw/heading
-    kappa0: Float,     // start point curvature 1/r
-    dk: Float, // curvature rate, how much curvature changes per unit length, end theta will be
+    /// start point xy
+    pub xy0: Position,
+    /// start point theta/yaw/heading
+    pub theta0: Angle,
+    /// cached cos and sin of theta
+    pub cos_theta0: Float,
+    pub sin_theta0: Float,
+    kappa0: ReciprocalLength,     // start point curvature 1/r
+    dk: ReciprocalArea, // curvature rate, how much curvature changes per unit length, end theta will be
     // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
     // theta(s) = theta + kappa0 * s + 1/2 * dk * s^2
     // with s = length
-    pub length: Float, // how long the curve is (end kappa will be length * dk)
+    pub length: Length, // how long the curve is (end kappa will be length * dk)
 }
 
 impl Default for Clothoid {
     fn default() -> Self {
         Self {
-            x0: 0.0,
-            y0: 0.0,
-            theta0: 0.0,
-            kappa0: 0.0,
-            dk: 0.0,
-            length: 1.0, // TODO(lucasw) should this be 0.0?
+            xy0: Position::default(),
+            theta0: Angle::zero(),
+            cos_theta0: 1.0,
+            sin_theta0: 0.0,
+            kappa0: ReciprocalLength::zero(),
+            dk: ReciprocalArea::zero(),
+            length: Length::zero(),
         }
     }
 }
@@ -446,7 +478,8 @@ fn eval_xy_a_large(a: Float, b: Float) -> (Float, Float) {
     (x, y)
 }
 
-fn fresnel_cs3(a: Float, b: Float, c: Float) -> (Float, Float) {
+// let (f_c, f_s) = fresnel_cs3(self.curvature_rate() * s * s, self.curvature() * s, self.theta0);
+fn fresnel_cs3(a: Float, b: Float, c: Angle) -> (Float, Float) {
     let threshold = 0.01;
     let a_series_size = 3;
     let xx: Float;
@@ -459,8 +492,8 @@ fn fresnel_cs3(a: Float, b: Float, c: Float) -> (Float, Float) {
         (xx, yy) = eval_xy_a_large(a, b);
     };
 
-    let cosc = cos(c);
-    let sinc = sin(c);
+    let cosc = cos(c.get::<radian>());
+    let sinc = sin(c.get::<radian>());
 
     let int_c = xx * cosc - yy * sinc;
     let int_s = xx * sinc + yy * cosc;
@@ -471,64 +504,73 @@ fn fresnel_cs3(a: Float, b: Float, c: Float) -> (Float, Float) {
 
 impl Clothoid {
     pub fn create(
-        x0: Float,
-        y0: Float,
-        theta0: Float,
-        kappa0: Float,
-        dk: Float,
-        length: Float,
+        x0: Length,
+        y0: Length,
+        theta0: Angle,
+        curvature0: ReciprocalLength,
+        curvature_rate: ReciprocalArea,
+        length: Length,
     ) -> Self {
         Self {
-            x0,
-            y0,
+            xy0: Position { x: x0, y: y0 },
             theta0: angle_unwrap(theta0),
-            kappa0,
-            dk,
+            cos_theta0: cos(theta0.get::<radian>()),
+            sin_theta0: sin(theta0.get::<radian>()),
+            kappa0: curvature0,
+            dk: curvature_rate,
             length,
         }
     }
 
-    pub fn get_start_theta(&self) -> Float {
+    pub fn get_start_theta(&self) -> Angle {
         self.theta0
     }
 
-    pub fn curvature(&self) -> Float {
+    pub fn curvature(&self) -> ReciprocalLength {
         self.kappa0
     }
 
-    pub fn curvature_rate(&self) -> Float {
+    pub fn curvature_rate(&self) -> ReciprocalArea {
         self.dk
     }
 
     // s is length along the curve, x and y will be in same units
-    fn get_xy(&self, s: Float) -> (Float, Float) {
-        let (f_c, f_s) = fresnel_cs3(self.dk * s * s, self.kappa0 * s, self.theta0);
+    fn get_xy(&self, s: Length) -> Position {
+        let (f_c, f_s) = fresnel_cs3(
+            (self.curvature_rate() * s * s).into(),
+            (self.curvature() * s).into(),
+            self.theta0,
+        );
         // println!("{:0.2} {:0.2} {:0.2}", s, f_c, f_s);
-        let x = self.x0 + s * f_c;
-        let y = self.y0 + s * f_s;
-        (x, y)
+        let x = self.xy0.x + s * f_c;
+        let y = self.xy0.y + s * f_s;
+        Position { x, y }
     }
 
-    pub fn get_xy_array(&self, s: Float) -> [Float; 2] {
-        let (x, y) = self.get_xy(s);
-        [x, y]
+    pub fn get_xy_array_meter(&self, s: Length) -> [Float; 2] {
+        let pos = self.get_xy(s);
+        [pos.x.get::<meter>(), pos.y.get::<meter>()]
     }
 
     /// get a new Clothoid at this location along the current one
-    pub fn get_clothoid(&self, s: Float) -> Self {
-        let (x_s, y_s) = self.get_xy(s);
+    pub fn get_clothoid(&self, s: Length) -> Self {
+        let xy_s = self.get_xy(s);
         // https://github.com/ebertolazzi/Clothoids/blob/master/src/Clothoids/Fresnel.hxx#L142
         // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
-        let theta_s = self.theta0 + s * (self.kappa0 + 0.5 * s * self.dk);
-        let kappa_s = self.kappa0 + s * self.dk; // curvature changes linearly with curvature_rate
+        let delta_curvature_s: ReciprocalLength = s * self.curvature_rate();
+        let theta_s = self.theta0 + Angle::new::<radian>(
+            (s * (self.curvature() + 0.5 * delta_curvature_s)).into()
+        );
+        let kappa_s = self.curvature() + delta_curvature_s; // curvature changes linearly with curvature_rate
 
         // TODO(lucasw) just use the same length as starting clothoid, or set to self.length - s
         // but only if s < self.length?
         let length = self.length;
         Self {
-            x0: x_s,
-            y0: y_s,
+            xy0: xy_s,
             theta0: angle_unwrap(theta_s),
+            cos_theta0: cos(theta_s.get::<radian>()),
+            sin_theta0: sin(theta_s.get::<radian>()),
             kappa0: kappa_s,
             dk: self.dk, // curvature rate is constant through the clothoid segment
             length,
@@ -543,13 +585,10 @@ impl Clothoid {
         let mut xys = [[0.0; 2]; NUM];
 
         let step = self.length / ((NUM - 1) as Float);
-        let mut s = 0.0;
 
-        for xys_i in xys.iter_mut().take(NUM) {
-            let xy = self.get_xy(s);
-            // println!("{:0.2} {:?}", s, xy);
-            *xys_i = [xy.0, xy.1];
-            s += step;
+        for (i, xys_i) in xys.iter_mut().take(NUM).enumerate() {
+            let s: Length = i as Float * step;
+            *xys_i = self.get_xy_array_meter(s);
         }
 
         xys
@@ -564,21 +603,18 @@ impl Clothoid {
         }
 
         let step = self.length / ((num - 1) as Float);
-        let mut s = 0.0;
 
-        for _ in 0..num {
-            let xy = self.get_xy(s);
-            // println!("{:0.2} {:?}", s, xy);
-            xys.push([xy.0, xy.1]);
-            s += step;
+        for i in 0..num {
+            let s: Length = i as Float * step;
+            xys.push(self.get_xy_array_meter(s));
         }
 
         xys
     }
 
-    fn dist_sq(p0: [Float; 2], p1: [Float; 2]) -> Float {
-        let dx = p1[0] - p0[0];
-        let dy = p1[1] - p0[1];
+    fn dist_sq(p0: &Position, p1: &Position) -> Area {
+        let dx = p1.x - p0.x;
+        let dy = p1.y - p0.y;
         dx * dx + dy * dy
     }
 
@@ -586,16 +622,16 @@ impl Clothoid {
     /// find the nearest point on the clothoid to the provided point
     /// s0 initial position on curve to start searching from
     /// return the s & xy location
-    pub fn get_nearest(&self, pt: [Float; 2], s0: Float) -> ([Float; 2], Float) {
+    pub fn get_nearest(&self, pt: &Position, s0: Length) -> (Position, Length) {
         let num = 16;
         let step = self.length / (4.0 * num as Float);
         let (_p_min, s) = self.get_nearest_with_step(pt, s0, step, num);
         self.get_nearest_with_step(pt, s, step / (num as Float), num)
     }
 
-    pub fn get_nearest_with_step(&self, pt: [Float; 2], s0: Float, fr: Float, num: usize) -> ([Float; 2], Float) {
-        let p0 = self.get_xy_array(s0);
-        let dist_sq0 = Self::dist_sq(pt, p0);
+    pub fn get_nearest_with_step(&self, pt: &Position, s0: Length, fr: Length, num: usize) -> (Position, Length) {
+        let p0 = self.get_xy(s0);
+        let dist_sq0 = Self::dist_sq(pt, &p0);
         let mut dist_sq_min = dist_sq0;
         let mut p_min = p0;
         let mut s_min = s0;
@@ -605,11 +641,11 @@ impl Clothoid {
             let mut s = s0;
             for _ in 0..num {
                 s += step;
-                if s < 0.0 || s > self.length {
+                if s < Length::zero() || s > self.length {
                     break;
                 }
-                let p = self.get_xy_array(s);
-                let dist_sq = Self::dist_sq(pt, p);
+                let p = self.get_xy(s);
+                let dist_sq = Self::dist_sq(pt, &p);
                 if dist_sq < dist_sq_min {
                     dist_sq_min = dist_sq;
                     p_min = p;
@@ -630,12 +666,13 @@ mod tests {
     extern crate std;
     use super::*;
     use std::format;
+    use uom::si::reciprocal_length::reciprocal_meter;
 
     #[test]
     fn get_points() {
-        let curvature = 1.0;
+        let curvature = ReciprocalLength::new::<reciprocal_meter>(1.0);
         let length = PI / (curvature * 2.0);
-        let c0 = Clothoid::create(0.0, 0.0, 0.0, curvature, 0.0, length);
+        let c0 = Clothoid::create(Length::zero(), Length::zero(), Angle::zero(), curvature, ReciprocalArea::zero(), length);
 
         const NUM: usize = 32;
         let pts0 = c0.get_points::<NUM>();
@@ -658,9 +695,9 @@ mod tests {
     #[test]
     fn curvatures() {
         // radius = 2.0
-        let curvature = 0.5;
-        let length = 1.0;
-        let clothoid0 = Clothoid::create(0.0, 0.0, 0.0, curvature, 0.0, length);
+        let curvature = ReciprocalLength::new::<reciprocal_meter>(0.5);
+        let length = Length::new::<meter>(1.0);
+        let clothoid0 = Clothoid::create(Length::zero(), Length::zero(), Angle::zero(), curvature, ReciprocalArea::zero(), length);
 
         // sample the clothoid at the end
         let clothoid1 = clothoid0.get_end_clothoid();
@@ -669,7 +706,7 @@ mod tests {
 
         // with no curvature rate, output clothoid curvature should always match input
         let msg = format!(
-            "{} -> {} at rate {}",
+            "{:?} -> {:?} at rate {:?}",
             clothoid0.curvature(),
             clothoid1.curvature(),
             clothoid0.curvature_rate()

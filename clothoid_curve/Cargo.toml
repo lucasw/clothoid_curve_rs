@@ -13,3 +13,5 @@ std = []
 [dependencies]
 # TODO(lucasw) only use libm when no using std
 libm = "0.2.8"
+typenum = "1.19.0"
+uom = "0.37.0"
