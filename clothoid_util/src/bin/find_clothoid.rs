@@ -1,29 +1,53 @@
 /// Copyright 2024 Lucas Walter
 ///
 ///
-use clothoid_curve::f64::{Clothoid, Float, angle_unwrap};
+use clothoid_curve::f64::{Clothoid, Float, ReciprocalArea, angle_unwrap};
 use clothoid_util::fit::find_clothoid;
+
+use uom::num_traits::Zero;
+use uom::si::{
+    angle::radian,
+    // area::square_meter,
+    f64::{
+        Angle,
+        // Area,
+        Length,
+        ReciprocalLength,
+    },
+    length::meter,
+    reciprocal_length::reciprocal_meter,
+};
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
-    let theta0: Float = angle_unwrap(args[1].parse().unwrap());
+    let theta0: Float = args[1].parse().unwrap();
     let curvature0: Float = args[2].parse().unwrap();
-    let target_theta: Float = angle_unwrap(args[3].parse().unwrap());
+    let target_theta: Float = args[3].parse().unwrap();
     let target_curvature: Float = args[4].parse().unwrap();
 
-    let length_guess = {
-        if target_curvature != 0.0 {
-            (target_theta - theta0) / target_curvature
+    let theta0 = angle_unwrap(Angle::new::<radian>(theta0));
+    let target_theta = angle_unwrap(Angle::new::<radian>(target_theta));
+    let target_curvature = ReciprocalLength::new::<reciprocal_meter>(target_curvature);
+
+    let length_guess: Length = {
+        if target_curvature != ReciprocalLength::zero() {
+            // TODO(lucasw) The real quantity of clothoid length is radian meter
+            ((target_theta - theta0) / target_curvature) / Angle::new::<radian>(1.0)
         } else {
-            1.0
+            Length::new::<meter>(1.0)
         }
     };
-    let curvature_rate_guess = (target_curvature - curvature0) / length_guess;
-    println!("length guess: {length_guess:0.3}, curvature_rate: {curvature_rate_guess:0.3}");
+
+    let curvature0 = ReciprocalLength::new::<reciprocal_meter>(curvature0);
+    let curvature_rate_guess: ReciprocalArea = (target_curvature - curvature0) / length_guess;
+    println!(
+        "length guess: {:?}, curvature_rate: {:?}",
+        length_guess, curvature_rate_guess
+    );
 
     let clothoid0 = Clothoid::create(
-        0.0,
-        0.0,
+        Length::zero(),
+        Length::zero(),
         theta0,
         curvature0,
         curvature_rate_guess,

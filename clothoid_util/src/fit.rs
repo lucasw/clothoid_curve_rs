@@ -15,24 +15,35 @@ use argmin::{
 };
 #[allow(unused_imports)]
 use argmin_observer_slog::SlogLogger;
-use clothoid_curve::f64::{Clothoid, angle_unwrap};
+use clothoid_curve::f64::{Clothoid, Position, ReciprocalArea, angle_unwrap};
 use finitediff::FiniteDiff;
+
+use uom::num_traits::Zero;
+use uom::si::{
+    angle::{degree, radian},
+    area::square_meter,
+    f64::{Angle, Area, Length, ReciprocalLength},
+    length::meter,
+    reciprocal_length::reciprocal_meter,
+};
 
 #[derive(Clone)]
 struct Curve {
-    x0: f64,
-    y0: f64,
-    theta0: f64,
-    curvature0: f64,
-    target_theta: f64,
-    target_curvature: f64,
+    xy0: Position,
+    theta0: Angle,
+    curvature0: ReciprocalLength,
+    target_theta: Angle,
+    target_curvature: ReciprocalLength,
 }
 
 impl Curve {
-    fn from_clothoid(clothoid0: &Clothoid, target_theta: f64, target_curvature: f64) -> Self {
+    fn from_clothoid(
+        clothoid0: &Clothoid,
+        target_theta: Angle,
+        target_curvature: ReciprocalLength,
+    ) -> Self {
         Self {
-            x0: clothoid0.x0,
-            y0: clothoid0.y0,
+            xy0: clothoid0.xy0.clone(),
             theta0: clothoid0.theta0,
             curvature0: clothoid0.curvature(),
             target_theta,
@@ -40,10 +51,10 @@ impl Curve {
         }
     }
 
-    fn to_clothoid(&self, curvature_rate: f64, length: f64) -> Clothoid {
+    fn to_clothoid(&self, curvature_rate: ReciprocalArea, length: Length) -> Clothoid {
         Clothoid::create(
-            self.x0,
-            self.y0,
+            self.xy0.x,
+            self.xy0.y,
             self.theta0,
             self.curvature0,
             curvature_rate,
@@ -51,7 +62,7 @@ impl Curve {
         )
     }
 
-    pub fn cost0(&self, curvature_rate: f64, length: f64) -> Result<f64, Error> {
+    pub fn cost0(&self, curvature_rate: ReciprocalArea, length: Length) -> Result<f64, Error> {
         // TODO(lucasw) need to limit curvature_rate to a maximum
         let curve0 = self.to_clothoid(curvature_rate, length);
         let curve_s = curve0.get_clothoid(length);
@@ -59,16 +70,18 @@ impl Curve {
         // println!("curvature {} -> {}",  curve0.curvature(), curve_s.curvature());
         let d_yaw = self.target_theta - curve_s.get_start_theta();
         // println!("d_yaw: {d_yaw}");
-        let d_yaw = angle_unwrap(d_yaw);
+        let d_yaw = angle_unwrap(d_yaw).get::<radian>();
         // println!("unwrapped d_yaw: {d_yaw}");
-        let d_curvature = self.target_curvature - curve_s.curvature();
+        let d_curvature = (self.target_curvature - curve_s.curvature()).get::<reciprocal_meter>();
+        // let curvature_rate = curvature_rate.get::<reciprocal_square_meter>();
+        let curvature_rate = 1.0 / (1.0 / curvature_rate).get::<square_meter>();
         // println!("d_curvature: {d_curvature} = {} - {}, init curvature: {}", self.target_curvature, curve_s.curvature(), curve0.curvature());
         let mut residual = 0.5 * (d_yaw * d_yaw)
             + 4.0 * (d_curvature * d_curvature)
             + 0.1 * (curvature_rate * curvature_rate);
         // TODO(lucasw) length needs to be > 0
-        if length < 0.0 {
-            residual += length * length;
+        if length < Length::zero() {
+            residual += (length * length).get::<square_meter>();
         }
         Ok(residual)
     }
@@ -79,7 +92,9 @@ impl CostFunction for Curve {
     type Output = f64;
 
     fn cost(&self, p: &Self::Param) -> Result<Self::Output, Error> {
-        self.cost0(p[0], p[1])
+        let curvature_rate: ReciprocalArea = 1.0 / Area::new::<square_meter>(1.0 / p[0]);
+        // ReciprocalArea::new::<reciprocal_square_meter>(p[0]),
+        self.cost0(curvature_rate, Length::new::<meter>(p[1]))
     }
 }
 
@@ -95,8 +110,8 @@ impl Gradient for Curve {
 
 pub fn find_clothoid(
     clothoid0: Clothoid, // initial conditions, curvature_rate and length are initial guess
-    target_theta: f64,
-    target_curvature: f64,
+    target_theta: Angle,
+    target_curvature: ReciprocalLength,
 ) -> Result<Clothoid, Error> {
     // Define cost function (must implement `CostFunction` and `Gradient`)
     let cost = Curve::from_clothoid(&clothoid0, target_theta, target_curvature);
@@ -121,7 +136,11 @@ pub fn find_clothoid(
     // TODO(lucasw) If the initial curvature rate is opposite target direction the solution
     // will loop around the longer way- would have to test both to see which is lower cost
     // should make it so doing a loop is almost always the wrong thing
-    let init_param: Vec<f64> = vec![curvature_rate_guess, length_guess];
+    let init_param: Vec<f64> = vec![
+        // curvature_rate_guess.get::<reciprocal_square_meter>(),
+        1.0 / (1.0 / curvature_rate_guess).get::<square_meter>(),
+        length_guess.get::<meter>(),
+    ];
     if verbose {
         println!("initial cost {:?}", cost.cost(&init_param));
     }
@@ -147,12 +166,12 @@ pub fn find_clothoid(
     }
 
     let param = res.state.param.unwrap();
-    let curvature_rate = param[0];
+    let curvature_rate = 1.0 / Area::new::<square_meter>(1.0 / param[0]);
     // TODO(lucasw) length needs to be > 0
-    let length = param[1];
+    let length = Length::new::<meter>(param[1]);
     let curve_solution = Clothoid::create(
-        cost.x0,
-        cost.y0,
+        cost.xy0.x,
+        cost.xy0.y,
         cost.theta0,
         cost.curvature0,
         curvature_rate,
@@ -165,9 +184,9 @@ pub fn find_clothoid(
         // println!("solution end: {curve_end:?}");
         println!(
             "target theta {:0.3} ({:0.3}°), target_curvature {:0.3}",
-            target_theta,
-            target_theta.to_degrees(),
-            target_curvature
+            target_theta.get::<radian>(),
+            target_theta.get::<degree>(),
+            target_curvature.get::<reciprocal_meter>(),
         );
     }
     Ok(curve_solution)
