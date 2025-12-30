@@ -57,3 +57,24 @@ pub mod f64 {
 
     include!("clothoid.rs");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::f64::Curvature;
+    use super::*;
+    use uom::si::f64::ReciprocalLength;
+    use uom::si::reciprocal_length::reciprocal_meter;
+
+    #[test]
+    fn curvature_vs_reciprocal_length() {
+        let c0 = Curvature::new::<reciprocal_meter>(0.5);
+        let c1 = ReciprocalLength::new::<reciprocal_meter>(0.5);
+
+        // TODO(lucasw) this passes, would need a newtype to prevent it
+        assert_eq!(c0, c1);
+
+        // are these basically type aliases?
+        let _c2: Curvature = c1.clone();
+        let _c3: ReciprocalLength = c0.clone();
+    }
+}
