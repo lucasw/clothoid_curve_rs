@@ -12,6 +12,8 @@ use std::f64::consts::PI;
 // use tracing::{debug, error, info, warn};
 use tracing::warn;
 
+use uom::si::{length::meter, reciprocal_length::reciprocal_meter};
+
 struct ClothoidToBezier {
     clothoid_bezier: ClothoidBezierApproximation,
     handle_length0: f64,
@@ -206,8 +208,8 @@ impl eframe::App for ClothoidToBezier {
                             // the more the two curves differ
                             let clothoid_s_distance = euclidean_tfrac * clothoid.length;
                             let cpt = clothoid.get_clothoid(clothoid_s_distance);
-                            let ex = pt[0] - cpt.x0;
-                            let ey = pt[1] - cpt.y0;
+                            let ex = pt[0] - cpt.xy0.x.get::<meter>();
+                            let ey = pt[1] - cpt.xy0.y.get::<meter>();
                             let error_distance = (ex * ex + ey * ey).sqrt();
 
                             let curvature = bezier.curvature(parametric_tfrac);
@@ -247,7 +249,7 @@ impl eframe::App for ClothoidToBezier {
                 let curvature_error: Vec<[f64; 2]> = bezier_distance
                     .clone()
                     .into_iter()
-                    .map(|x| [x.0, x.2 - x.3])
+                    .map(|x| [x.0, x.2 - x.3.get::<reciprocal_meter>()])
                     .collect();
 
                 egui_plot::Plot::new("error")
@@ -299,7 +301,7 @@ impl eframe::App for ClothoidToBezier {
             let mut expected = Vec::new();
             for vals in &bezier_distance {
                 measured.push(0.0);
-                expected.push(vals.2 - vals.3);
+                expected.push(vals.2 - vals.3.get::<reciprocal_meter>());
             }
             let rmse_curvature = eval_metrics::regression::rmse(&measured, &expected).unwrap();
             // ui.label(format!("rmse {rmse:.6}"));

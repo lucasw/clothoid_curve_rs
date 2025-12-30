@@ -1,14 +1,23 @@
 //! Adapted from egui custom_plot_manipulation example
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use clothoid_curve::f64::Clothoid;
+use clothoid_curve::f64::{Clothoid, Position};
 use clothoid_util::fit::find_clothoid;
 use eframe::egui::{self, DragValue, Event, Vec2};
 use egui_plot::{Legend, Line, LineStyle, PlotPoints, Points};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 
-type Target = (Clothoid, f64, f64);
+use uom::num_traits::Zero;
+use uom::si::{
+    angle::radian,
+    area::square_meter,
+    f64::{Angle, Area, Length, ReciprocalLength},
+    length::meter,
+    reciprocal_length::reciprocal_meter,
+};
+
+type Target = (Clothoid, Angle, ReciprocalLength);
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -20,7 +29,7 @@ fn main() -> Result<(), eframe::Error> {
     // and then send back a solution curve periodically
     thread::spawn(move || {
         println!("solver threading running");
-        let mut last_target = (Clothoid::default(), 0.0, 0.0);
+        let mut last_target = (Clothoid::default(), Angle::zero(), ReciprocalLength::zero());
         loop {
             thread::sleep(std::time::Duration::from_millis(50));
             // println!("waking");
@@ -43,7 +52,7 @@ fn main() -> Result<(), eframe::Error> {
             // solve for target theta/kappa
             let (curve, target_theta, target_kappa) = target;
             // println!("new target received: {target_theta} {target_kappa}\n{curve:?}");
-            println!("new target received: {target_theta} {target_kappa}");
+            println!("new target received: {target_theta:?} {target_kappa:?}");
 
             match find_clothoid(curve, target_theta, target_kappa) {
                 Ok(curve_solution) => {
@@ -82,9 +91,9 @@ struct PlotCurve {
     target_sender: Sender<Target>,
     solution_receiver: Receiver<Clothoid>,
 
-    mouse_point: [f64; 2],
-    curve_point_closest: [f64; 2],
-    curve_s_closest: f64,
+    mouse_point: Position,
+    curve_point_closest: Position,
+    curve_s_closest: Length,
 }
 
 impl PlotCurve {
@@ -108,9 +117,9 @@ impl PlotCurve {
             curve_solution: Clothoid::default(),
             target_sender,
             solution_receiver,
-            curve_point_closest: [0.0, 0.0],
-            curve_s_closest: 0.0,
-            mouse_point: [0.0, 0.0],
+            curve_point_closest: Position::default(),
+            curve_s_closest: Length::zero(),
+            mouse_point: Position::default(),
         }
     }
 }
@@ -233,18 +242,23 @@ impl eframe::App for PlotCurve {
             ui.label("Show a clothoid curve according to input controls, and also attempt to solve for desired curve end point angle and curvature given input curve initial conditions and only varying length and curvature_rate");
 
             let curve = Clothoid::create(
-                self.x0,
-                self.y0,
-                self.theta0,
-                self.kappa0,
-                self.dk,
-                self.length,
+                Length::new::<meter>(self.x0),
+                Length::new::<meter>(self.y0),
+                Angle::new::<radian>(self.theta0),
+                ReciprocalLength::new::<reciprocal_meter>(self.kappa0),
+                1.0 / Area::new::<square_meter>(1.0 / self.dk),
+                Length::new::<meter>(self.length),
             );
 
-            (self.curve_point_closest, self.curve_s_closest) = curve.get_nearest(self.mouse_point, self.curve_s_closest);
-            ui.label(format!("Cursor position: x={:.1}, y={:.1}, {:?} {:.3}", self.mouse_point[0], self.mouse_point[1], self.curve_point_closest, self.curve_s_closest));
+            (self.curve_point_closest, self.curve_s_closest) = curve.get_nearest(&self.mouse_point, self.curve_s_closest);
+            ui.label(format!("Cursor position: x={:.1}, y={:.1}, {:?} {:.3}",
+                self.mouse_point.x.get::<meter>(),
+                self.mouse_point.y.get::<meter>(),
+                self.curve_point_closest,
+                self.curve_s_closest.get::<meter>(),
+            ));
 
-            let plot = egui_plot::Plot::new("plot")
+            let _plot = egui_plot::Plot::new("plot")
                 .allow_zoom(false)
                 .allow_drag(false)
                 .allow_scroll(false)
@@ -314,7 +328,11 @@ impl eframe::App for PlotCurve {
                     }
 
                     // println!("sending new target {} {}", self.target_theta, self.target_kappa);
-                    let _rv = self.target_sender.send((curve.clone(), self.target_theta, self.target_kappa));
+                    let _rv = self.target_sender.send((
+                        curve.clone(),
+                        Angle::new::<radian>(self.target_theta),
+                        ReciprocalLength::new::<reciprocal_meter>(self.target_kappa),
+                    ));
                     // println!("{rv:?}");
 
                     while let Ok(new_solution) = self.solution_receiver.try_recv() {
@@ -331,9 +349,19 @@ impl eframe::App for PlotCurve {
                     plot_ui.line(Line::new(solution_curve_points).name("Solution Curve").style(LineStyle::dotted_loose()));
 
                     if let Some(pos) = plot_ui.pointer_coordinate() {
-                        self.mouse_point = [pos.x as f64, pos.y as f64];
+                        self.mouse_point = Position {
+                            x: Length::new::<meter>(pos.x),
+                            y: Length::new::<meter>(pos.y),
+                        };
                     }
-                    plot_ui.line(Line::new(vec![self.mouse_point, self.curve_point_closest]).name("closest point").style(LineStyle::dotted_loose()));
+                    plot_ui.line(Line::new(vec![
+                            [self.mouse_point.x.get::<meter>(),
+                             self.mouse_point.y.get::<meter>(),
+                            ],
+                            [self.curve_point_closest.x.get::<meter>(),
+                             self.curve_point_closest.y.get::<meter>(),
+                            ]
+                    ]).name("closest point").style(LineStyle::dotted_loose()));
                 });
         });
     }
