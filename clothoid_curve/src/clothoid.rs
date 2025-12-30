@@ -45,9 +45,9 @@ dimension: ISQ<
         Z0,     // amount of substance
         Z0>;    // luminous intensity
 */
-type ReciprocalArea = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
+pub type ReciprocalArea = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Position {
     pub x: Length,
     pub y: Length,
