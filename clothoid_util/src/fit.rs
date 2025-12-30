@@ -15,14 +15,16 @@ use argmin::{
 };
 #[allow(unused_imports)]
 use argmin_observer_slog::SlogLogger;
-use clothoid_curve::f64::{Clothoid, Curvature, CurvaturePerLength, Position, angle_unwrap};
+use clothoid_curve::f64::{
+    Clothoid, Curvature, CurvaturePerLength, Position, angle_unwrap, curvature_per_meter,
+};
 use finitediff::FiniteDiff;
 
 use uom::num_traits::Zero;
 use uom::si::{
     angle::{degree, radian},
     area::square_meter,
-    f64::{Angle, Area, Length},
+    f64::{Angle, Length},
     length::meter,
     reciprocal_length::reciprocal_meter,
 };
@@ -92,7 +94,7 @@ impl CostFunction for Curve {
     type Output = f64;
 
     fn cost(&self, p: &Self::Param) -> Result<Self::Output, Error> {
-        let curvature_rate: CurvaturePerLength = 1.0 / Area::new::<square_meter>(1.0 / p[0]);
+        let curvature_rate = curvature_per_meter(p[0]);
         // CurvaturePerLength::new::<reciprocal_square_meter>(p[0]),
         self.cost0(curvature_rate, Length::new::<meter>(p[1]))
     }
@@ -166,7 +168,7 @@ pub fn find_clothoid(
     }
 
     let param = res.state.param.unwrap();
-    let curvature_rate = 1.0 / Area::new::<square_meter>(1.0 / param[0]);
+    let curvature_rate = curvature_per_meter(param[0]);
     // TODO(lucasw) length needs to be > 0
     let length = Length::new::<meter>(param[1]);
     let curve_solution = Clothoid::create(

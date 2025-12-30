@@ -1,7 +1,7 @@
 //! Adapted from egui custom_plot_manipulation example
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use clothoid_curve::f64::{Clothoid, Curvature, Position};
+use clothoid_curve::f64::{curvature_per_meter, Clothoid, Curvature, Position};
 use clothoid_util::fit::find_clothoid;
 use eframe::egui::{self, DragValue, Event, Vec2};
 use egui_plot::{Legend, Line, LineStyle, PlotPoints, Points};
@@ -11,8 +11,7 @@ use std::thread;
 use uom::num_traits::Zero;
 use uom::si::{
     angle::radian,
-    area::square_meter,
-    f64::{Angle, Area, Length},
+    f64::{Angle, Length},
     length::meter,
     reciprocal_length::reciprocal_meter,
 };
@@ -246,7 +245,7 @@ impl eframe::App for PlotCurve {
                 Length::new::<meter>(self.y0),
                 Angle::new::<radian>(self.theta0),
                 Curvature::new::<reciprocal_meter>(self.kappa0),
-                1.0 / Area::new::<square_meter>(1.0 / self.dk),
+                curvature_per_meter(self.dk),
                 Length::new::<meter>(self.length),
             );
 

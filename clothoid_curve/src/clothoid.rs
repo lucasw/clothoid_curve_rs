@@ -22,6 +22,7 @@ use uom::num_traits::Zero;
 use uom::si::{
     ISQ, Quantity, SI,
     angle::radian,
+    area::square_meter,
     length::meter,
 };
 
@@ -47,6 +48,12 @@ dimension: ISQ<
 */
 pub type Curvature = Quantity<ISQ<N1, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
 pub type CurvaturePerLength = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
+
+// impl CurvaturePerLength {
+pub fn curvature_per_meter(val: Float) -> CurvaturePerLength {
+    1.0 / Area::new::<square_meter>(1.0 / val)
+}
+//}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Position {

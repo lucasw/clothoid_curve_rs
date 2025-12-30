@@ -18,7 +18,6 @@ use finitediff::FiniteDiff;
 
 use uom::num_traits::Zero;
 use uom::si::{
-    area::square_meter,
     length::meter,
     reciprocal_length::reciprocal_meter,
 };
@@ -69,7 +68,7 @@ impl ClothoidBezierApproximation {
             Length::new::<meter>(y0),
             Angle::zero(),
             Curvature::new::<reciprocal_meter>(self.curvature),
-            1.0 / Area::new::<square_meter>(1.0 / self.curvature_rate),
+            curvature_per_meter(self.curvature_rate),
             Length::new::<meter>(self.length),
         )
     }

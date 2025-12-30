@@ -61,7 +61,7 @@ pub mod f64 {
 #[cfg(test)]
 mod tests {
     use super::f64::Curvature;
-    use super::*;
+    // use super::*;
     use uom::si::f64::ReciprocalLength;
     use uom::si::reciprocal_length::reciprocal_meter;
 
