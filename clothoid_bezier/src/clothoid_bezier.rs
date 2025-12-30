@@ -16,6 +16,13 @@ use argmin_observer_slog::SlogLogger;
 #[cfg(feature = "argmin_fit")]
 use finitediff::FiniteDiff;
 
+use uom::num_traits::Zero;
+use uom::si::{
+    area::square_meter,
+    length::meter,
+    reciprocal_length::reciprocal_meter,
+};
+
 /// approximate a clothoid with a cubic bezier
 pub struct ClothoidBezierApproximation {
     pub curvature: NativeFloat,
@@ -58,12 +65,12 @@ impl ClothoidBezierApproximation {
         let x0 = 0.0;
         let y0 = 0.0;
         Clothoid::create(
-            x0,
-            y0,
-            0.0,
-            self.curvature,
-            self.curvature_rate,
-            self.length,
+            Length::new::<meter>(x0),
+            Length::new::<meter>(y0),
+            Angle::zero(),
+            ReciprocalLength::new::<reciprocal_meter>(self.curvature),
+            1.0 / Area::new::<square_meter>(1.0 / self.curvature_rate),
+            Length::new::<meter>(self.length),
         )
     }
 
@@ -74,20 +81,22 @@ impl ClothoidBezierApproximation {
     ) -> CubicBezier2 {
         let clothoid_end = clothoid.get_end_clothoid();
         // the bezier end points
-        let bz_pt0: [NativeFloat; 2] = [clothoid.x0, clothoid.y0];
-        let bz_pt3: [NativeFloat; 2] = [clothoid_end.x0, clothoid_end.y0];
+        let bz_pt0: [NativeFloat; 2] = [clothoid.xy0.x.get::<meter>(), clothoid.xy0.y.get::<meter>()];
+        let bz_pt3: [NativeFloat; 2] = [clothoid_end.xy0.x.get::<meter>(), clothoid_end.xy0.y.get::<meter>()];
 
         // find where the handles are
-        let bz_angle0 = clothoid.theta0;
+        let cos_bz_angle0 = clothoid.cos_theta0;
+        let sin_bz_angle0 = clothoid.sin_theta0;
         let bz_pt1 = [
-            bz_pt0[0] + handle_length0 * cos(bz_angle0),
-            bz_pt0[1] + handle_length0 * sin(bz_angle0),
+            bz_pt0[0] + handle_length0 * cos_bz_angle0,
+            bz_pt0[1] + handle_length0 * sin_bz_angle0,
         ];
 
-        let bz_angle1 = clothoid_end.theta0;
+        let cos_bz_angle1 = clothoid_end.cos_theta0;
+        let sin_bz_angle1 = clothoid_end.sin_theta0;
         let bz_pt2 = [
-            bz_pt3[0] - handle_length1 * cos(bz_angle1),
-            bz_pt3[1] - handle_length1 * sin(bz_angle1),
+            bz_pt3[0] - handle_length1 * cos_bz_angle1,
+            bz_pt3[1] - handle_length1 * sin_bz_angle1,
         ];
 
         CubicBezier2::new(
@@ -103,11 +112,11 @@ impl ClothoidBezierApproximation {
         let clothoid = self.to_clothoid();
         let bezier = Self::get_bezier(&clothoid, handle_length0, handle_length1);
         let curvature0 = clothoid.curvature();
-        let delta0 = curvature0 - bezier.curvature(0.0);
+        let delta0 = curvature0.get::<reciprocal_meter>() - bezier.curvature(0.0);
 
         let clothoid_end = clothoid.get_end_clothoid();
         let curvature1 = clothoid_end.curvature();
-        let delta1 = curvature1 - bezier.curvature(1.0);
+        let delta1 = curvature1.get::<reciprocal_meter>() - bezier.curvature(1.0);
 
         let length_delta = self.length - bezier.arclen(32);
 

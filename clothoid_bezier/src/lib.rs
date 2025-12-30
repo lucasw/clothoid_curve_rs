@@ -24,6 +24,8 @@ pub mod f32 {
     // use libm::sinf as sin;
     use libm::sqrtf as sqrt;
 
+    // use uom::si::f32::{Angle, Area, Length, ReciprocalLength};
+
     // specialized types
     pub mod cubic_bezier {
         include!("cubic_bezier.rs");
@@ -64,8 +66,10 @@ pub mod f64 {
     use libm::acos;
     use libm::cos;
     use libm::pow;
-    use libm::sin;
+    // use libm::sin;
     use libm::sqrt;
+
+    use uom::si::f64::{Angle, Area, Length, ReciprocalLength};
 
     // specialized types
     pub mod cubic_bezier {
