@@ -1,7 +1,7 @@
 //! Adapted from egui custom_plot_manipulation example
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use clothoid_curve::f64::{Clothoid, Position};
+use clothoid_curve::f64::{Clothoid, Curvature, Position};
 use clothoid_util::fit::find_clothoid;
 use eframe::egui::{self, DragValue, Event, Vec2};
 use egui_plot::{Legend, Line, LineStyle, PlotPoints, Points};
@@ -12,12 +12,12 @@ use uom::num_traits::Zero;
 use uom::si::{
     angle::radian,
     area::square_meter,
-    f64::{Angle, Area, Length, ReciprocalLength},
+    f64::{Angle, Area, Length},
     length::meter,
     reciprocal_length::reciprocal_meter,
 };
 
-type Target = (Clothoid, Angle, ReciprocalLength);
+type Target = (Clothoid, Angle, Curvature);
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -29,7 +29,7 @@ fn main() -> Result<(), eframe::Error> {
     // and then send back a solution curve periodically
     thread::spawn(move || {
         println!("solver threading running");
-        let mut last_target = (Clothoid::default(), Angle::zero(), ReciprocalLength::zero());
+        let mut last_target = (Clothoid::default(), Angle::zero(), Curvature::zero());
         loop {
             thread::sleep(std::time::Duration::from_millis(50));
             // println!("waking");
@@ -245,7 +245,7 @@ impl eframe::App for PlotCurve {
                 Length::new::<meter>(self.x0),
                 Length::new::<meter>(self.y0),
                 Angle::new::<radian>(self.theta0),
-                ReciprocalLength::new::<reciprocal_meter>(self.kappa0),
+                Curvature::new::<reciprocal_meter>(self.kappa0),
                 1.0 / Area::new::<square_meter>(1.0 / self.dk),
                 Length::new::<meter>(self.length),
             );
@@ -331,7 +331,7 @@ impl eframe::App for PlotCurve {
                     let _rv = self.target_sender.send((
                         curve.clone(),
                         Angle::new::<radian>(self.target_theta),
-                        ReciprocalLength::new::<reciprocal_meter>(self.target_kappa),
+                        Curvature::new::<reciprocal_meter>(self.target_kappa),
                     ));
                     // println!("{rv:?}");
 

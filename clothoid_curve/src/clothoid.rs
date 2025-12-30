@@ -16,7 +16,7 @@ use core::iter::Iterator;
 use core::default::Default;
 use core::prelude::rust_2024::derive;
 
-use typenum::{N2, Z0};
+use typenum::{N1, N2, Z0};
 use uom::Kind;
 use uom::num_traits::Zero;
 use uom::si::{
@@ -45,7 +45,8 @@ dimension: ISQ<
         Z0,     // amount of substance
         Z0>;    // luminous intensity
 */
-pub type ReciprocalArea = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
+pub type Curvature = Quantity<ISQ<N1, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
+pub type CurvaturePerLength = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Position {
@@ -62,8 +63,8 @@ pub struct Clothoid {
     /// cached cos and sin of theta
     pub cos_theta0: Float,
     pub sin_theta0: Float,
-    kappa0: ReciprocalLength,     // start point curvature 1/r
-    dk: ReciprocalArea, // curvature rate, how much curvature changes per unit length, end theta will be
+    kappa0: Curvature,     // start point curvature 1/r
+    dk: CurvaturePerLength, // curvature rate, how much curvature changes per unit length, end theta will be
     // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
     // theta(s) = theta + kappa0 * s + 1/2 * dk * s^2
     // with s = length
@@ -77,8 +78,8 @@ impl Default for Clothoid {
             theta0: Angle::zero(),
             cos_theta0: 1.0,
             sin_theta0: 0.0,
-            kappa0: ReciprocalLength::zero(),
-            dk: ReciprocalArea::zero(),
+            kappa0: Curvature::zero(),
+            dk: CurvaturePerLength::zero(),
             length: Length::zero(),
         }
     }
@@ -507,8 +508,8 @@ impl Clothoid {
         x0: Length,
         y0: Length,
         theta0: Angle,
-        curvature0: ReciprocalLength,
-        curvature_rate: ReciprocalArea,
+        curvature0: Curvature,
+        curvature_rate: CurvaturePerLength,
         length: Length,
     ) -> Self {
         Self {
@@ -526,11 +527,11 @@ impl Clothoid {
         self.theta0
     }
 
-    pub fn curvature(&self) -> ReciprocalLength {
+    pub fn curvature(&self) -> Curvature {
         self.kappa0
     }
 
-    pub fn curvature_rate(&self) -> ReciprocalArea {
+    pub fn curvature_rate(&self) -> CurvaturePerLength {
         self.dk
     }
 
@@ -557,7 +558,7 @@ impl Clothoid {
         let xy_s = self.get_xy(s);
         // https://github.com/ebertolazzi/Clothoids/blob/master/src/Clothoids/Fresnel.hxx#L142
         // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
-        let delta_curvature_s: ReciprocalLength = s * self.curvature_rate();
+        let delta_curvature_s: Curvature = s * self.curvature_rate();
         let theta_s = self.theta0 + Angle::new::<radian>(
             (s * (self.curvature() + 0.5 * delta_curvature_s)).into()
         );
@@ -670,9 +671,9 @@ mod tests {
 
     #[test]
     fn get_points() {
-        let curvature = ReciprocalLength::new::<reciprocal_meter>(1.0);
+        let curvature = Curvature::new::<reciprocal_meter>(1.0);
         let length = PI / (curvature * 2.0);
-        let c0 = Clothoid::create(Length::zero(), Length::zero(), Angle::zero(), curvature, ReciprocalArea::zero(), length);
+        let c0 = Clothoid::create(Length::zero(), Length::zero(), Angle::zero(), curvature, CurvaturePerLength::zero(), length);
 
         const NUM: usize = 32;
         let pts0 = c0.get_points::<NUM>();
@@ -695,9 +696,9 @@ mod tests {
     #[test]
     fn curvatures() {
         // radius = 2.0
-        let curvature = ReciprocalLength::new::<reciprocal_meter>(0.5);
+        let curvature = Curvature::new::<reciprocal_meter>(0.5);
         let length = Length::new::<meter>(1.0);
-        let clothoid0 = Clothoid::create(Length::zero(), Length::zero(), Angle::zero(), curvature, ReciprocalArea::zero(), length);
+        let clothoid0 = Clothoid::create(Length::zero(), Length::zero(), Angle::zero(), curvature, CurvaturePerLength::zero(), length);
 
         // sample the clothoid at the end
         let clothoid1 = clothoid0.get_end_clothoid();

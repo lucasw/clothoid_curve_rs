@@ -68,7 +68,7 @@ impl ClothoidBezierApproximation {
             Length::new::<meter>(x0),
             Length::new::<meter>(y0),
             Angle::zero(),
-            ReciprocalLength::new::<reciprocal_meter>(self.curvature),
+            Curvature::new::<reciprocal_meter>(self.curvature),
             1.0 / Area::new::<square_meter>(1.0 / self.curvature_rate),
             Length::new::<meter>(self.length),
         )

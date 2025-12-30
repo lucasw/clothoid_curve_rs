@@ -15,14 +15,14 @@ use argmin::{
 };
 #[allow(unused_imports)]
 use argmin_observer_slog::SlogLogger;
-use clothoid_curve::f64::{Clothoid, Position, ReciprocalArea, angle_unwrap};
+use clothoid_curve::f64::{Clothoid, Curvature, CurvaturePerLength, Position, angle_unwrap};
 use finitediff::FiniteDiff;
 
 use uom::num_traits::Zero;
 use uom::si::{
     angle::{degree, radian},
     area::square_meter,
-    f64::{Angle, Area, Length, ReciprocalLength},
+    f64::{Angle, Area, Length},
     length::meter,
     reciprocal_length::reciprocal_meter,
 };
@@ -31,16 +31,16 @@ use uom::si::{
 struct Curve {
     xy0: Position,
     theta0: Angle,
-    curvature0: ReciprocalLength,
+    curvature0: Curvature,
     target_theta: Angle,
-    target_curvature: ReciprocalLength,
+    target_curvature: Curvature,
 }
 
 impl Curve {
     fn from_clothoid(
         clothoid0: &Clothoid,
         target_theta: Angle,
-        target_curvature: ReciprocalLength,
+        target_curvature: Curvature,
     ) -> Self {
         Self {
             xy0: clothoid0.xy0.clone(),
@@ -51,7 +51,7 @@ impl Curve {
         }
     }
 
-    fn to_clothoid(&self, curvature_rate: ReciprocalArea, length: Length) -> Clothoid {
+    fn to_clothoid(&self, curvature_rate: CurvaturePerLength, length: Length) -> Clothoid {
         Clothoid::create(
             self.xy0.x,
             self.xy0.y,
@@ -62,7 +62,7 @@ impl Curve {
         )
     }
 
-    pub fn cost0(&self, curvature_rate: ReciprocalArea, length: Length) -> Result<f64, Error> {
+    pub fn cost0(&self, curvature_rate: CurvaturePerLength, length: Length) -> Result<f64, Error> {
         // TODO(lucasw) need to limit curvature_rate to a maximum
         let curve0 = self.to_clothoid(curvature_rate, length);
         let curve_s = curve0.get_clothoid(length);
@@ -92,8 +92,8 @@ impl CostFunction for Curve {
     type Output = f64;
 
     fn cost(&self, p: &Self::Param) -> Result<Self::Output, Error> {
-        let curvature_rate: ReciprocalArea = 1.0 / Area::new::<square_meter>(1.0 / p[0]);
-        // ReciprocalArea::new::<reciprocal_square_meter>(p[0]),
+        let curvature_rate: CurvaturePerLength = 1.0 / Area::new::<square_meter>(1.0 / p[0]);
+        // CurvaturePerLength::new::<reciprocal_square_meter>(p[0]),
         self.cost0(curvature_rate, Length::new::<meter>(p[1]))
     }
 }
@@ -111,7 +111,7 @@ impl Gradient for Curve {
 pub fn find_clothoid(
     clothoid0: Clothoid, // initial conditions, curvature_rate and length are initial guess
     target_theta: Angle,
-    target_curvature: ReciprocalLength,
+    target_curvature: Curvature,
 ) -> Result<Clothoid, Error> {
     // Define cost function (must implement `CostFunction` and `Gradient`)
     let cost = Curve::from_clothoid(&clothoid0, target_theta, target_curvature);

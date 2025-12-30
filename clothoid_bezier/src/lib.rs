@@ -15,6 +15,9 @@ pub mod f32 {
 
     pub type NativeFloat = f32;
     const EPSILON: core::primitive::f32 = core::primitive::f32::EPSILON;
+
+    // use clothoid_curve::f32::Curvature;
+
     use core::f32::consts::PI;
 
     // TODO(lucasw) use std versions if available
@@ -24,7 +27,7 @@ pub mod f32 {
     // use libm::sinf as sin;
     use libm::sqrtf as sqrt;
 
-    // use uom::si::f32::{Angle, Area, Length, ReciprocalLength};
+    // use uom::si::f32::{Angle, Area, Length, Curvature};
 
     // specialized types
     pub mod cubic_bezier {
@@ -62,6 +65,9 @@ pub mod f64 {
 
     pub type NativeFloat = f64;
     const EPSILON: core::primitive::f64 = core::primitive::f64::EPSILON;
+
+    use clothoid_curve::f64::Curvature;
+
     use core::f64::consts::PI;
     use libm::acos;
     use libm::cos;
@@ -69,7 +75,7 @@ pub mod f64 {
     // use libm::sin;
     use libm::sqrt;
 
-    use uom::si::f64::{Angle, Area, Length, ReciprocalLength};
+    use uom::si::f64::{Angle, Area, Length};
 
     // specialized types
     pub mod cubic_bezier {

@@ -1,7 +1,7 @@
 /// Copyright 2024 Lucas Walter
 ///
 ///
-use clothoid_curve::f64::{Clothoid, Float, ReciprocalArea, angle_unwrap};
+use clothoid_curve::f64::{Clothoid, Curvature, CurvaturePerLength, Float, angle_unwrap};
 use clothoid_util::fit::find_clothoid;
 
 use uom::num_traits::Zero;
@@ -12,7 +12,6 @@ use uom::si::{
         Angle,
         // Area,
         Length,
-        ReciprocalLength,
     },
     length::meter,
     reciprocal_length::reciprocal_meter,
@@ -27,10 +26,10 @@ fn main() {
 
     let theta0 = angle_unwrap(Angle::new::<radian>(theta0));
     let target_theta = angle_unwrap(Angle::new::<radian>(target_theta));
-    let target_curvature = ReciprocalLength::new::<reciprocal_meter>(target_curvature);
+    let target_curvature = Curvature::new::<reciprocal_meter>(target_curvature);
 
     let length_guess: Length = {
-        if target_curvature != ReciprocalLength::zero() {
+        if target_curvature != Curvature::zero() {
             // TODO(lucasw) The real quantity of clothoid length is radian meter
             ((target_theta - theta0) / target_curvature) / Angle::new::<radian>(1.0)
         } else {
@@ -38,8 +37,8 @@ fn main() {
         }
     };
 
-    let curvature0 = ReciprocalLength::new::<reciprocal_meter>(curvature0);
-    let curvature_rate_guess: ReciprocalArea = (target_curvature - curvature0) / length_guess;
+    let curvature0 = Curvature::new::<reciprocal_meter>(curvature0);
+    let curvature_rate_guess: CurvaturePerLength = (target_curvature - curvature0) / length_guess;
     println!(
         "length guess: {:?}, curvature_rate: {:?}",
         length_guess, curvature_rate_guess
