@@ -16,7 +16,8 @@ use argmin::{
 #[allow(unused_imports)]
 use argmin_observer_slog::SlogLogger;
 use clothoid_curve::f64::{
-    Clothoid, Curvature, CurvaturePerLength, Position, angle_unwrap, curvature_per_meter,
+    Clothoid, CurvaturePerLength, Position, angle_unwrap, curvature_per_meter,
+    curvature_per_meter_float,
 };
 use finitediff::FiniteDiff;
 
@@ -24,9 +25,9 @@ use uom::num_traits::Zero;
 use uom::si::{
     angle::{degree, radian},
     area::square_meter,
-    f64::{Angle, Length},
+    curvature::radian_per_meter,
+    f64::{Angle, Curvature, Length},
     length::meter,
-    reciprocal_length::reciprocal_meter,
 };
 
 #[derive(Clone)]
@@ -74,9 +75,9 @@ impl Curve {
         // println!("d_yaw: {d_yaw}");
         let d_yaw = angle_unwrap(d_yaw).get::<radian>();
         // println!("unwrapped d_yaw: {d_yaw}");
-        let d_curvature = (self.target_curvature - curve_s.curvature()).get::<reciprocal_meter>();
+        let d_curvature = (self.target_curvature - curve_s.curvature()).get::<radian_per_meter>();
         // let curvature_rate = curvature_rate.get::<reciprocal_square_meter>();
-        let curvature_rate = 1.0 / (1.0 / curvature_rate).get::<square_meter>();
+        let curvature_rate = curvature_per_meter_float(curvature_rate);
         // println!("d_curvature: {d_curvature} = {} - {}, init curvature: {}", self.target_curvature, curve_s.curvature(), curve0.curvature());
         let mut residual = 0.5 * (d_yaw * d_yaw)
             + 4.0 * (d_curvature * d_curvature)
@@ -139,8 +140,7 @@ pub fn find_clothoid(
     // will loop around the longer way- would have to test both to see which is lower cost
     // should make it so doing a loop is almost always the wrong thing
     let init_param: Vec<f64> = vec![
-        // curvature_rate_guess.get::<reciprocal_square_meter>(),
-        1.0 / (1.0 / curvature_rate_guess).get::<square_meter>(),
+        curvature_per_meter_float(curvature_rate_guess),
         length_guess.get::<meter>(),
     ];
     if verbose {
@@ -188,7 +188,7 @@ pub fn find_clothoid(
             "target theta {:0.3} ({:0.3}°), target_curvature {:0.3}",
             target_theta.get::<radian>(),
             target_theta.get::<degree>(),
-            target_curvature.get::<reciprocal_meter>(),
+            target_curvature.get::<radian_per_meter>(),
         );
     }
     Ok(curve_solution)

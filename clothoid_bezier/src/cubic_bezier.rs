@@ -5,8 +5,8 @@ use super::LineSegment;
 use super::QuadraticBezier;
 use super::*;
 use uom::si::{
+    curvature::radian_per_meter,
     length::meter,
-    reciprocal_length::reciprocal_meter,
 };
 
 fn position_to_point2(pos: &Position) -> PointN<2> {
@@ -89,7 +89,7 @@ impl CubicBezier2 {
     }
 
     pub fn curvature(&self, t: ParametricTFrac) -> Curvature {
-        Curvature::new::<reciprocal_meter>(self.0.curvature(t.0))
+        Curvature::new::<radian_per_meter>(self.0.curvature(t.0))
     }
 }
 

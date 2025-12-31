@@ -1,7 +1,7 @@
 //! Adapted from egui custom_plot_manipulation example
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use clothoid_curve::f64::{curvature_per_meter, Clothoid, Curvature, Position};
+use clothoid_curve::f64::{curvature_per_meter, Clothoid, Position};
 use clothoid_util::fit::find_clothoid;
 use eframe::egui::{self, DragValue, Event, Vec2};
 use egui_plot::{Legend, Line, LineStyle, PlotPoints, Points};
@@ -11,9 +11,9 @@ use std::thread;
 use uom::num_traits::Zero;
 use uom::si::{
     angle::radian,
-    f64::{Angle, Length},
+    curvature::radian_per_meter,
+    f64::{Angle, Curvature, Length},
     length::meter,
-    reciprocal_length::reciprocal_meter,
 };
 
 type Target = (Clothoid, Angle, Curvature);
@@ -244,7 +244,7 @@ impl eframe::App for PlotCurve {
                 Length::new::<meter>(self.x0),
                 Length::new::<meter>(self.y0),
                 Angle::new::<radian>(self.theta0),
-                Curvature::new::<reciprocal_meter>(self.kappa0),
+                Curvature::new::<radian_per_meter>(self.kappa0),
                 curvature_per_meter(self.dk),
                 Length::new::<meter>(self.length),
             );
@@ -330,7 +330,7 @@ impl eframe::App for PlotCurve {
                     let _rv = self.target_sender.send((
                         curve.clone(),
                         Angle::new::<radian>(self.target_theta),
-                        Curvature::new::<reciprocal_meter>(self.target_kappa),
+                        Curvature::new::<radian_per_meter>(self.target_kappa),
                     ));
                     // println!("{rv:?}");
 

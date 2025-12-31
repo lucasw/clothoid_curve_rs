@@ -16,8 +16,8 @@ use core::iter::Iterator;
 use core::default::Default;
 use core::prelude::rust_2024::derive;
 
-use typenum::{N1, N2, Z0};
-use uom::Kind;
+use typenum::{N2, Z0};
+use uom::si::marker::AngleKind;
 use uom::num_traits::Zero;
 use uom::si::{
     ISQ, Quantity, SI,
@@ -38,7 +38,7 @@ use alloc::vec::Vec;
 
 /*
 dimension: ISQ<
-        N1,     // length
+        N2,     // length
         Z0,     // mass
         Z0,     // time
         Z0,     // electric current
@@ -46,13 +46,18 @@ dimension: ISQ<
         Z0,     // amount of substance
         Z0>;    // luminous intensity
 */
-// TODO(lucasw) Curvature already exists in uom, use that instead
-pub type Curvature = Quantity<ISQ<N1, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
-pub type CurvaturePerLength = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
+pub type CurvaturePerLength = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn AngleKind>, SI<V>, V>;
 
+// TODO(lucasw) need a custom reciprocal_square_meter unit
 // impl CurvaturePerLength {
 pub fn curvature_per_meter(val: Float) -> CurvaturePerLength {
-    1.0 / Area::new::<square_meter>(1.0 / val)
+    (1.0 / Area::new::<square_meter>(1.0 / val)).into()
+}
+
+/// turn CurvaturePerLength into a float
+pub fn curvature_per_meter_float(cpl: CurvaturePerLength) -> Float {
+    let area: Area = (1.0 / cpl).into();
+    1.0 / area.get::<square_meter>()
 }
 //}
 
@@ -589,7 +594,7 @@ impl Clothoid {
         let xy_s = self.get_xy(s);
         // https://github.com/ebertolazzi/Clothoids/blob/master/src/Clothoids/Fresnel.hxx#L142
         // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
-        let delta_curvature_s: Curvature = s * self.curvature_rate();
+        let delta_curvature_s: Curvature = (s * self.curvature_rate()).into();
         let theta_s = self.theta0 + Angle::new::<radian>(
             (s * (self.curvature() + 0.5 * delta_curvature_s)).into()
         );
@@ -698,12 +703,12 @@ mod tests {
     extern crate std;
     use super::*;
     use std::format;
-    use uom::si::reciprocal_length::reciprocal_meter;
+    use uom::si::curvature::radian_per_meter;
 
     #[test]
     fn get_points() {
-        let curvature = Curvature::new::<reciprocal_meter>(1.0);
-        let length = PI / (curvature * 2.0);
+        let curvature = Curvature::new::<radian_per_meter>(1.0);
+        let length: Length = (PI / (curvature * 2.0)).into();
         let c0 = Clothoid::create(Length::zero(), Length::zero(), Angle::zero(), curvature, CurvaturePerLength::zero(), length);
 
         const NUM: usize = 32;
@@ -727,7 +732,7 @@ mod tests {
     #[test]
     fn curvatures() {
         // radius = 2.0
-        let curvature = Curvature::new::<reciprocal_meter>(0.5);
+        let curvature = Curvature::new::<radian_per_meter>(0.5);
         let length = Length::new::<meter>(1.0);
         let clothoid0 = Clothoid::create(Length::zero(), Length::zero(), Angle::zero(), curvature, CurvaturePerLength::zero(), length);
 

@@ -6,7 +6,6 @@ December 2025
 show how well a set of bezier curves can approximate a clothoid curve
 */
 use clothoid_bezier::f64::ClothoidBezierApproximation;
-use clothoid_curve::f64::Curvature;
 use egui::{CentralPanel, Color32, Stroke, TopBottomPanel};
 use egui_plot::{Legend, Line, Points};
 use std::f64::consts::PI;
@@ -14,12 +13,9 @@ use std::f64::consts::PI;
 use tracing::warn;
 
 use uom::si::{
-    f64::{
-        // Curvature,
-        Length,
-    },
+    curvature::radian_per_meter,
+    f64::{Curvature, Length},
     length::meter,
-    reciprocal_length::reciprocal_meter,
 };
 
 struct ClothoidToBezier {
@@ -271,7 +267,7 @@ impl eframe::App for ClothoidToBezier {
                     .map(|v| {
                         [
                             v.bezier_s_distance.get::<meter>(),
-                            v.error_curvature.get::<reciprocal_meter>(),
+                            v.error_curvature.get::<radian_per_meter>(),
                         ]
                     })
                     .collect();
@@ -325,7 +321,7 @@ impl eframe::App for ClothoidToBezier {
             let mut expected = Vec::new();
             for vals in &bezier_distance {
                 measured.push(0.0);
-                expected.push(vals.error_curvature.get::<reciprocal_meter>());
+                expected.push(vals.error_curvature.get::<radian_per_meter>());
             }
             let rmse_curvature = eval_metrics::regression::rmse(&measured, &expected).unwrap();
             // ui.label(format!("rmse {rmse:.6}"));

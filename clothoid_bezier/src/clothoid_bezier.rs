@@ -18,8 +18,8 @@ use finitediff::FiniteDiff;
 
 use uom::num_traits::Zero;
 use uom::si::{
+    curvature::radian_per_meter,
     length::meter,
-    reciprocal_length::reciprocal_meter,
 };
 
 /// approximate a clothoid with a cubic bezier
@@ -69,7 +69,7 @@ impl ClothoidBezierApproximation {
             Length::new::<meter>(x0),
             Length::new::<meter>(y0),
             Angle::zero(),
-            Curvature::new::<reciprocal_meter>(self.curvature),
+            Curvature::new::<radian_per_meter>(self.curvature),
             curvature_per_meter(self.curvature_rate),
             Length::new::<meter>(self.length),
         )
@@ -100,11 +100,11 @@ impl ClothoidBezierApproximation {
         let clothoid = self.to_clothoid();
         let bezier = Self::get_bezier(&clothoid, handle0, handle1);
         let curvature0 = clothoid.curvature();
-        let delta0 = (curvature0 - bezier.curvature(ParametricTFrac::start())).get::<reciprocal_meter>();
+        let delta0 = (curvature0 - bezier.curvature(ParametricTFrac::start())).get::<radian_per_meter>();
 
         let clothoid_end = clothoid.get_end_clothoid();
         let curvature1 = clothoid_end.curvature();
-        let delta1 = (curvature1 - bezier.curvature(ParametricTFrac::end())).get::<reciprocal_meter>();
+        let delta1 = (curvature1 - bezier.curvature(ParametricTFrac::end())).get::<radian_per_meter>();
 
         let length_delta = self.length - bezier.arclen(32).get::<meter>();
 
