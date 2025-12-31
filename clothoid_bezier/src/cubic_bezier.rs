@@ -4,6 +4,94 @@ use super::point::Point;
 use super::LineSegment;
 use super::QuadraticBezier;
 use super::*;
+use uom::si::{
+    length::meter,
+    reciprocal_length::reciprocal_meter,
+};
+
+fn position_to_point2(pos: &Position) -> PointN<2> {
+    let xy: [NativeFloat; 2] = [pos.x.get::<meter>(), pos.y.get::<meter>()];
+    PointN::new(xy)
+}
+
+fn point2_to_position(p: PointN<2>) -> Position {
+    Position {
+        x: Length::new::<meter>(p.axis(0)),
+        y: Length::new::<meter>(p.axis(1)),
+    }
+}
+
+// TODO(lucasw) can I avoid the redundant sizes?
+type CubicBezier2Base = CubicBezier::<PointN<2>, 2>;
+#[derive(Clone)]
+pub struct CubicBezier2(CubicBezier2Base);
+
+#[derive(Clone, Copy)]
+pub struct ParametricTFrac(NativeFloat);
+
+impl ParametricTFrac {
+    pub fn start() -> Self {
+        Self(0.0)
+    }
+
+    pub fn end() -> Self {
+        Self(1.0)
+    }
+}
+
+impl CubicBezier2 {
+    pub fn new(start: &Position, ctrl1: &Position, ctrl2: &Position, end: &Position) -> Self {
+        // TODO(lucasw) optionally cache length?
+        Self(CubicBezier2Base::new(
+            position_to_point2(start),
+            position_to_point2(ctrl1),
+            position_to_point2(ctrl2),
+            position_to_point2(end),
+        ))
+    }
+
+    pub fn start(&self) -> Position {
+        Position::from_array_meter([self.0.start.axis(0), self.0.start.axis(1)])
+    }
+
+    pub fn ctrl1(&self) -> Position {
+        Position::from_array_meter([self.0.ctrl1.axis(0), self.0.ctrl1.axis(1)])
+    }
+
+    pub fn ctrl2(&self) -> Position {
+        Position::from_array_meter([self.0.ctrl2.axis(0), self.0.ctrl2.axis(1)])
+    }
+
+    pub fn end(&self) -> Position {
+        Position::from_array_meter([self.0.end.axis(0), self.0.end.axis(1)])
+    }
+
+    pub fn arclen(&self, nsteps: usize) -> Length {
+        Length::new::<meter>(self.0.arclen(nsteps))
+    }
+
+    // TODO(lucasw) provide another fn with tolerance
+    pub fn arclen_castlejau(&self) -> Length {
+        Length::new::<meter>(self.0.arclen_castlejau(None))
+    }
+
+    /// require the length be computed elsehwere, though may want to optionally have a cached
+    /// length to use after computing it the first time
+    pub fn euclidean_to_parametric_t(&self, euclidean_t: NativeFloat, bezier_length: Length) -> (Length, ParametricTFrac) {
+        let desired_length = euclidean_t * bezier_length;
+        let (achieved_len, parametric_tfrac) = self.0.desired_len_to_parametric_t(desired_length.get::<meter>(), None);
+        // TODO(lucasw) also return achieved_len / bezier_length as achieved_euclidean_t?
+        (Length::new::<meter>(achieved_len), ParametricTFrac(parametric_tfrac))
+    }
+
+    pub fn eval(&self, t: ParametricTFrac) -> Position {
+        point2_to_position(self.0.eval(t.0))
+    }
+
+    pub fn curvature(&self, t: ParametricTFrac) -> Curvature {
+        Curvature::new::<reciprocal_meter>(self.0.curvature(t.0))
+    }
+}
 
 /// A 2D  cubic Bezier curve defined by four points: the starting point, two successive control points and the ending point.
 ///
@@ -18,9 +106,6 @@ pub struct CubicBezier<P, const PDIM: usize> {
     pub ctrl2: P,
     pub end: P,
 }
-
-// TODO(lucasw) can I avoid the redundant sizes?
-pub type CubicBezier2 = CubicBezier::<PointN<2>, 2>;
 
 //#[allow(dead_code)]
 impl<P, const PDIM: usize> CubicBezier<P, PDIM>
@@ -571,60 +656,54 @@ mod tests {
     #[test]
     fn circle_approximation_error() {
         // define closure for unit circle
-        let circle =
-            |p: PointN<2>| -> NativeFloat { p.into_iter().map(|x| x * x).sum::<NativeFloat>().sqrt() - 1.0 };
+        let circle_error =
+            |p: Position, radius: Length| -> Length { (p.x * p.x + p.y * p.y).sqrt() - radius };
 
+        let radius = 1.0;
         // define control points for 4 bezier segments
         // control points are chosen for minimum radial distance error
         // according to: http://spencermortensen.com/articles/bezier-circle/
         // TODO don't hardcode values
-        let c = 0.551915024494;
+        let c = 0.551915024494 * radius;
         let max_drift_perc = 0.019608; // radial drift percent
-        let max_error = max_drift_perc * 0.011; // absolute max radial error
+        let max_error = max_drift_perc * 0.011 * radius; // absolute max radial error
 
-        let bezier_quadrant_1 = CubicBezier2 {
-            start: PointN::new([0.0, 1.0]),
-            ctrl1: PointN::new([c, 1.0]),
-            ctrl2: PointN::new([1.0, c]),
-            end: PointN::new([1.0, 0.0]),
-        };
-        let bezier_quadrant_2 = CubicBezier2 {
-            start: PointN::new([1.0, 0.0]),
-            ctrl1: PointN::new([1.0, -c]),
-            ctrl2: PointN::new([c, -1.0]),
-            end: PointN::new([0.0, -1.0]),
-        };
-        let bezier_quadrant_3 = CubicBezier2 {
-            start: PointN::new([0.0, -1.0]),
-            ctrl1: PointN::new([-c, -1.0]),
-            ctrl2: PointN::new([-1.0, -c]),
-            end: PointN::new([-1.0, 0.0]),
-        };
-        let bezier_quadrant_4 = CubicBezier2 {
-            start: PointN::new([-1.0, 0.0]),
-            ctrl1: PointN::new([-1.0, c]),
-            ctrl2: PointN::new([-c, 1.0]),
-            end: PointN::new([0.0, 1.0]),
-        };
+        let bezier_quadrants = [
+            CubicBezier2::new(
+                &Position::from_array_meter([0.0, radius]),
+                &Position::from_array_meter([c, radius]),
+                &Position::from_array_meter([radius, c]),
+                &Position::from_array_meter([radius, 0.0]),
+            ),
+            CubicBezier2::new(
+                &Position::from_array_meter([radius, 0.0]),
+                &Position::from_array_meter([radius, -c]),
+                &Position::from_array_meter([c, -radius]),
+                &Position::from_array_meter([0.0, -radius]),
+            ),
+            CubicBezier2::new(
+                &Position::from_array_meter([0.0, -radius]),
+                &Position::from_array_meter([-c, -radius]),
+                &Position::from_array_meter([-radius, -c]),
+                &Position::from_array_meter([-radius, 0.0]),
+            ),
+            CubicBezier2::new(
+                &Position::from_array_meter([-radius, 0.0]),
+                &Position::from_array_meter([-radius, c]),
+                &Position::from_array_meter([-c, radius]),
+                &Position::from_array_meter([0.0, radius]),
+            ),
+        ];
+        let radius = Length::new::<meter>(radius);
         let nsteps = 1000;
         for t in 0..=nsteps {
-            let t = t as NativeFloat * 1.0 / (nsteps as NativeFloat);
+            let t = ParametricTFrac(t as NativeFloat / (nsteps as NativeFloat));
 
-            let point = bezier_quadrant_1.eval(t);
-            let contour = circle(point);
-            assert!(contour.abs() <= max_error, "{} <= {max_error}", contour.abs());
-
-            let point = bezier_quadrant_2.eval(t);
-            let contour = circle(point);
-            assert!(contour.abs() <= max_error, "{} <= {max_error}", contour.abs());
-
-            let point = bezier_quadrant_3.eval(t);
-            let contour = circle(point);
-            assert!(contour.abs() <= max_error, "{} <= {max_error}", contour.abs());
-
-            let point = bezier_quadrant_4.eval(t);
-            let contour = circle(point);
-            assert!(contour.abs() <= max_error, "{} <= {max_error}", contour.abs());
+            for bezier_quadrant in &bezier_quadrants {
+                let point = bezier_quadrant.eval(t);
+                let error = circle_error(point, radius).get::<meter>();
+                assert!(error.abs() <= max_error, "{} <= {max_error}", error.abs());
+            }
         }
     }
 

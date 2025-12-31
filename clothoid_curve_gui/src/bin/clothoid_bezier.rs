@@ -5,14 +5,22 @@ December 2025
 
 show how well a set of bezier curves can approximate a clothoid curve
 */
-use clothoid_bezier::f64::{ClothoidBezierApproximation, Point};
+use clothoid_bezier::f64::ClothoidBezierApproximation;
+use clothoid_curve::f64::Curvature;
 use egui::{CentralPanel, Color32, Stroke, TopBottomPanel};
 use egui_plot::{Legend, Line, Points};
 use std::f64::consts::PI;
 // use tracing::{debug, error, info, warn};
 use tracing::warn;
 
-use uom::si::{length::meter, reciprocal_length::reciprocal_meter};
+use uom::si::{
+    f64::{
+        // Curvature,
+        Length,
+    },
+    length::meter,
+    reciprocal_length::reciprocal_meter,
+};
 
 struct ClothoidToBezier {
     clothoid_bezier: ClothoidBezierApproximation,
@@ -30,7 +38,6 @@ impl eframe::App for ClothoidToBezier {
         let num_pts = 2 * ((self.clothoid_bezier.length * 5.0) as usize).clamp(4, 64);
         let fr = 1.0 / (num_pts - 1) as f64;
 
-        // let mut bezier_distance = Vec::new();
         TopBottomPanel::top("controls").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label("curvature");
@@ -81,9 +88,10 @@ impl eframe::App for ClothoidToBezier {
                 }
 
                 if ui.button("find handles").clicked() {
-                    let rv = self
-                        .clothoid_bezier
-                        .find_handles(self.handle_length0, self.handle_length1);
+                    let rv = self.clothoid_bezier.find_handles(
+                        Length::new::<meter>(self.handle_length0),
+                        Length::new::<meter>(self.handle_length1),
+                    );
                     if let Ok(handles) = rv {
                         // go to optimal in one step
                         // self.handle_length0 = handles.0;
@@ -129,10 +137,18 @@ impl eframe::App for ClothoidToBezier {
 
         let bezier = ClothoidBezierApproximation::get_bezier(
             &self.clothoid_bezier.to_clothoid(),
-            self.handle_length0,
-            self.handle_length1,
+            Length::new::<meter>(self.handle_length0),
+            Length::new::<meter>(self.handle_length1),
         );
-        let mut bezier_distance = Vec::new();
+        #[derive(Clone)]
+        struct ClothoidBezierDistance {
+            bezier_s_distance: Length,
+            error_distance: Length,
+            error_curvature: Curvature,
+            // bezier_curvature: Curvature,
+            // clothoid_curvature: Curvature,
+        }
+        let mut bezier_distance: Vec<ClothoidBezierDistance> = Vec::new();
         CentralPanel::default().show(ctx, |ui| {
             egui::Grid::new("grid").num_columns(1).show(ui, |ui| {
                 egui_plot::Plot::new("plot")
@@ -163,10 +179,10 @@ impl eframe::App for ClothoidToBezier {
                                 .color(Color32::CYAN),
                         );
 
-                        let bz_pt0 = [bezier.start.axis(0), bezier.start.axis(1)];
-                        let bz_pt1 = [bezier.ctrl1.axis(0), bezier.ctrl1.axis(1)];
-                        let bz_pt2 = [bezier.ctrl2.axis(0), bezier.ctrl2.axis(1)];
-                        let bz_pt3 = [bezier.end.axis(0), bezier.end.axis(1)];
+                        let bz_pt0 = bezier.start().as_array_meter();
+                        let bz_pt1 = bezier.ctrl1().as_array_meter();
+                        let bz_pt2 = bezier.ctrl2().as_array_meter();
+                        let bz_pt3 = bezier.end().as_array_meter();
                         plot_ui.line(
                             Line::new(vec![bz_pt0, bz_pt1])
                                 .name("handle")
@@ -190,36 +206,34 @@ impl eframe::App for ClothoidToBezier {
                         );
 
                         // TODO(lucasw) add this to stroke 'get_euclidean_pts(num)'
-                        let bezier_length = bezier.arclen_castlejau(None);
+                        let bezier_length = bezier.arclen_castlejau();
 
                         let mut bezier_pts = Vec::new();
                         for i in 0..num_pts {
-                            let euclidean_tfrac = i as f64 * fr;
-                            let s_distance = euclidean_tfrac * bezier_length;
-
-                            let desired_length = euclidean_tfrac * bezier_length;
-                            let (_len, parametric_tfrac) =
-                                bezier.desired_len_to_parametric_t(desired_length, None);
+                            let desired_euclidean_tfrac = i as f64 * fr;
+                            let (bezier_s_distance, parametric_tfrac) = bezier
+                                .euclidean_to_parametric_t(desired_euclidean_tfrac, bezier_length);
+                            let achieved_euclidean_tfrac = bezier_s_distance / bezier_length;
                             let pt = bezier.eval(parametric_tfrac);
-                            let pt = [pt.axis(0), pt.axis(1)];
-                            bezier_pts.push(pt);
+                            bezier_pts.push(pt.as_array_meter());
 
                             // this will be increasingly different from bezier s_distance
-                            // the more the two curves differ
-                            let clothoid_s_distance = euclidean_tfrac * clothoid.length;
+                            // the more the two curves differ in length
+                            let clothoid_s_distance = achieved_euclidean_tfrac * clothoid.length;
                             let cpt = clothoid.get_clothoid(clothoid_s_distance);
-                            let ex = pt[0] - cpt.xy0.x.get::<meter>();
-                            let ey = pt[1] - cpt.xy0.y.get::<meter>();
+                            let ex = pt.x - cpt.xy0.x;
+                            let ey = pt.y - cpt.xy0.y;
                             let error_distance = (ex * ex + ey * ey).sqrt();
 
-                            let curvature = bezier.curvature(parametric_tfrac);
+                            let bezier_curvature = bezier.curvature(parametric_tfrac);
+                            let clothoid_curvature = cpt.curvature();
+                            let error_curvature: Curvature = bezier_curvature - clothoid_curvature; //.into();
 
-                            bezier_distance.push((
-                                s_distance,
+                            bezier_distance.push(ClothoidBezierDistance {
+                                bezier_s_distance,
                                 error_distance,
-                                curvature,
-                                cpt.curvature(),
-                            ));
+                                error_curvature,
+                            });
                         }
 
                         let color = Color32::ORANGE;
@@ -244,12 +258,22 @@ impl eframe::App for ClothoidToBezier {
                 let position_error: Vec<[f64; 2]> = bezier_distance
                     .clone()
                     .into_iter()
-                    .map(|x| [x.0, x.1])
+                    .map(|v| {
+                        [
+                            v.bezier_s_distance.get::<meter>(),
+                            v.error_distance.get::<meter>(),
+                        ]
+                    })
                     .collect();
                 let curvature_error: Vec<[f64; 2]> = bezier_distance
                     .clone()
                     .into_iter()
-                    .map(|x| [x.0, x.2 - x.3.get::<reciprocal_meter>()])
+                    .map(|v| {
+                        [
+                            v.bezier_s_distance.get::<meter>(),
+                            v.error_curvature.get::<reciprocal_meter>(),
+                        ]
+                    })
                     .collect();
 
                 egui_plot::Plot::new("error")
@@ -292,7 +316,7 @@ impl eframe::App for ClothoidToBezier {
             let mut expected = Vec::new();
             for vals in &bezier_distance {
                 measured.push(0.0);
-                expected.push(vals.1);
+                expected.push(vals.error_distance.get::<meter>());
             }
             let rmse_position = eval_metrics::regression::rmse(&measured, &expected).unwrap();
             ui.label(format!("rmse position {rmse_position:.9}"));
@@ -301,7 +325,7 @@ impl eframe::App for ClothoidToBezier {
             let mut expected = Vec::new();
             for vals in &bezier_distance {
                 measured.push(0.0);
-                expected.push(vals.2 - vals.3.get::<reciprocal_meter>());
+                expected.push(vals.error_curvature.get::<reciprocal_meter>());
             }
             let rmse_curvature = eval_metrics::regression::rmse(&measured, &expected).unwrap();
             // ui.label(format!("rmse {rmse:.6}"));

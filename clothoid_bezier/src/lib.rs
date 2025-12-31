@@ -17,6 +17,7 @@ pub mod f32 {
     const EPSILON: core::primitive::f32 = core::primitive::f32::EPSILON;
 
     // use clothoid_curve::f32::curvature_per_meter;
+    use clothoid_curve::f32::{Curvature, Position};
 
     use core::f32::consts::PI;
 
@@ -27,7 +28,7 @@ pub mod f32 {
     // use libm::sinf as sin;
     use libm::sqrtf as sqrt;
 
-    // use uom::si::f32::{Angle, Area, Length, Curvature};
+    use uom::si::f32::Length;
 
     // specialized types
     pub mod cubic_bezier {
@@ -49,7 +50,7 @@ pub mod f32 {
         include!("roots.rs");
     }
 
-    pub use cubic_bezier::CubicBezier2;
+    pub use cubic_bezier::{CubicBezier2, ParametricTFrac};
     pub use line::LineSegment;
     pub use point::Point;
     pub use point::PointN;
@@ -66,7 +67,7 @@ pub mod f64 {
     pub type NativeFloat = f64;
     const EPSILON: core::primitive::f64 = core::primitive::f64::EPSILON;
 
-    use clothoid_curve::f64::{Curvature, curvature_per_meter};
+    use clothoid_curve::f64::{Curvature, Position, curvature_per_meter};
 
     use core::f64::consts::PI;
     use libm::acos;
@@ -97,7 +98,7 @@ pub mod f64 {
         include!("roots.rs");
     }
 
-    pub use cubic_bezier::CubicBezier2;
+    pub use cubic_bezier::{CubicBezier2, ParametricTFrac};
     pub use line::LineSegment;
     pub use point::Point;
     pub use point::PointN;

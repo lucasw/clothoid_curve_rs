@@ -23,6 +23,8 @@ use uom::si::{
 };
 
 /// approximate a clothoid with a cubic bezier
+/// not using uom types here so this can be used directly in egui
+/// TODO(lucasw) make a uom-egui adapter
 pub struct ClothoidBezierApproximation {
     pub curvature: NativeFloat,
     pub curvature_rate: NativeFloat,
@@ -42,8 +44,8 @@ impl CostFunction for &ClothoidBezierApproximation {
     type Output = NativeFloat;
 
     fn cost(&self, p: &Self::Param) -> Result<Self::Output, Error> {
-        let handle_length0 = p[0];
-        let handle_length1 = p[1];
+        let handle_length0 = Length::new::<meter>(p[0]);
+        let handle_length1 = Length::new::<meter>(p[1]);
         self.cost0(handle_length0, handle_length1)
     }
 }
@@ -74,58 +76,45 @@ impl ClothoidBezierApproximation {
     }
 
     pub fn get_bezier(
-        clothoid: &Clothoid,
-        handle_length0: NativeFloat,
-        handle_length1: NativeFloat,
+        clothoid_start: &Clothoid,
+        handle0: Length,
+        handle1: Length,
     ) -> CubicBezier2 {
-        let clothoid_end = clothoid.get_end_clothoid();
+        let clothoid_end = clothoid_start.get_end_clothoid();
         // the bezier end points
-        let bz_pt0: [NativeFloat; 2] = [clothoid.xy0.x.get::<meter>(), clothoid.xy0.y.get::<meter>()];
-        let bz_pt3: [NativeFloat; 2] = [clothoid_end.xy0.x.get::<meter>(), clothoid_end.xy0.y.get::<meter>()];
+        let start = &clothoid_start.xy0;
+        let end = &clothoid_end.xy0;
 
         // find where the handles are
-        let cos_bz_angle0 = clothoid.cos_theta0;
-        let sin_bz_angle0 = clothoid.sin_theta0;
-        let bz_pt1 = [
-            bz_pt0[0] + handle_length0 * cos_bz_angle0,
-            bz_pt0[1] + handle_length0 * sin_bz_angle0,
-        ];
+        let clothoid_start_straight = clothoid_start.zero_curvature();
+        let ctrl1 = clothoid_start_straight.get_xy(handle0);
 
-        let cos_bz_angle1 = clothoid_end.cos_theta0;
-        let sin_bz_angle1 = clothoid_end.sin_theta0;
-        let bz_pt2 = [
-            bz_pt3[0] - handle_length1 * cos_bz_angle1,
-            bz_pt3[1] - handle_length1 * sin_bz_angle1,
-        ];
+        let clothoid_end_straight = clothoid_end.zero_curvature();
+        let ctrl2 = clothoid_end_straight.get_xy(-handle1);
 
-        CubicBezier2::new(
-            PointN::new(bz_pt0),
-            PointN::new(bz_pt1),
-            PointN::new(bz_pt2),
-            PointN::new(bz_pt3),
-        )
+        CubicBezier2::new(start, &ctrl1, &ctrl2, end)
     }
 
     #[cfg(feature = "argmin_fit")]
-    fn cost0(&self, handle_length0: NativeFloat, handle_length1: NativeFloat) -> Result<NativeFloat, Error> {
+    fn cost0(&self, handle0: Length, handle1: Length) -> Result<NativeFloat, Error> {
         let clothoid = self.to_clothoid();
-        let bezier = Self::get_bezier(&clothoid, handle_length0, handle_length1);
+        let bezier = Self::get_bezier(&clothoid, handle0, handle1);
         let curvature0 = clothoid.curvature();
-        let delta0 = curvature0.get::<reciprocal_meter>() - bezier.curvature(0.0);
+        let delta0 = (curvature0 - bezier.curvature(ParametricTFrac::start())).get::<reciprocal_meter>();
 
         let clothoid_end = clothoid.get_end_clothoid();
         let curvature1 = clothoid_end.curvature();
-        let delta1 = curvature1.get::<reciprocal_meter>() - bezier.curvature(1.0);
+        let delta1 = (curvature1 - bezier.curvature(ParametricTFrac::end())).get::<reciprocal_meter>();
 
-        let length_delta = self.length - bezier.arclen(32);
+        let length_delta = self.length - bezier.arclen(32).get::<meter>();
 
         let mut residual = delta0 * delta0 + delta1 * delta1 + 0.1 * length_delta * length_delta;
 
-        if handle_length0 < 0.0 {
-            residual += -handle_length0;
+        if handle0 < Length::zero() {
+            residual += -handle0.get::<meter>();
         }
-        if handle_length1 < 0.0 {
-            residual += -handle_length1;
+        if handle1 < Length::zero() {
+            residual += -handle1.get::<meter>();
         }
 
         /*
@@ -148,12 +137,12 @@ impl ClothoidBezierApproximation {
     #[cfg(feature = "argmin_fit")]
     pub fn find_handles(
         &self,
-        handle0_guess: NativeFloat,
-        handle1_guess: NativeFloat,
+        handle0_guess: Length,
+        handle1_guess: Length,
     ) -> Result<(NativeFloat, NativeFloat), Error> {
         let verbose = true;
 
-        let init_param: Vec<NativeFloat> = vec![handle0_guess, handle1_guess];
+        let init_param: Vec<NativeFloat> = vec![handle0_guess.get::<meter>(), handle1_guess.get::<meter>()];
         if verbose {
             /*
             info!(
@@ -204,13 +193,13 @@ mod clothoid_bezier_tests {
             let scs = [0.45, 0.5, 0.6, 0.7, 0.8, 1.0];
             for sc0 in &scs {
                 for sc1 in &scs {
-                    let handle0_guess = radius * sc0;
-                    let handle1_guess = radius * sc1;
+                    let handle0_guess = Length::new::<meter>(radius * sc0);
+                    let handle1_guess = Length::new::<meter>(radius * sc1);
                     let (handle0, handle1) = cba.find_handles(handle0_guess, handle1_guess).unwrap();
                     let expected = radius * 0.55;
                     let threshold = 0.02 * radius;
-                    assert!((handle0 - expected).abs() < threshold, "sc {sc0}, r {radius}, guess {handle0_guess} -> {handle0} {expected}");
-                    assert!((handle1 - expected).abs() < threshold, "sc {sc1}, r {radius}, guess {handle1_guess} -> {handle1} {expected}");
+                    assert!((handle0 - expected).abs() < threshold, "sc {sc0}, r {radius}, guess {handle0_guess:?} -> {handle0:?} {expected:?}");
+                    assert!((handle1 - expected).abs() < threshold, "sc {sc1}, r {radius}, guess {handle1_guess:?} -> {handle1:?} {expected:?}");
                 }
             }
         }

@@ -46,6 +46,7 @@ dimension: ISQ<
         Z0,     // amount of substance
         Z0>;    // luminous intensity
 */
+// TODO(lucasw) Curvature already exists in uom, use that instead
 pub type Curvature = Quantity<ISQ<N1, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
 pub type CurvaturePerLength = Quantity<ISQ<N2, Z0, Z0, Z0, Z0, Z0, Z0, dyn Kind>, SI<V>, V>;
 
@@ -59,6 +60,19 @@ pub fn curvature_per_meter(val: Float) -> CurvaturePerLength {
 pub struct Position {
     pub x: Length,
     pub y: Length,
+}
+
+impl Position {
+    pub fn from_array_meter(p: [Float; 2]) -> Self {
+        Position {
+            x: Length::new::<meter>(p[0]),
+            y: Length::new::<meter>(p[1]),
+        }
+    }
+
+    pub fn as_array_meter(&self) -> [Float; 2] {
+        [self.x.get::<meter>(), self.y.get::<meter>()]
+    }
 }
 
 #[derive(Clone, PartialEq)]
@@ -538,12 +552,27 @@ impl Clothoid {
         self.kappa0
     }
 
+    pub fn set_curvature(&mut self, curvature: Curvature) {
+        self.kappa0 = curvature;
+    }
+
     pub fn curvature_rate(&self) -> CurvaturePerLength {
         self.dk
     }
 
+    pub fn set_curvature_rate(&mut self, curvature_rate: CurvaturePerLength) {
+        self.dk = curvature_rate;
+    }
+
+    pub fn zero_curvature(&self) -> Self {
+        let mut straight = self.clone();
+        straight.set_curvature(Curvature::zero());
+        straight.set_curvature_rate(CurvaturePerLength::zero());
+        straight
+    }
+
     // s is length along the curve, x and y will be in same units
-    fn get_xy(&self, s: Length) -> Position {
+    pub fn get_xy(&self, s: Length) -> Position {
         let (f_c, f_s) = fresnel_cs3(
             (self.curvature_rate() * s * s).into(),
             (self.curvature() * s).into(),
@@ -553,11 +582,6 @@ impl Clothoid {
         let x = self.xy0.x + s * f_c;
         let y = self.xy0.y + s * f_s;
         Position { x, y }
-    }
-
-    pub fn get_xy_array_meter(&self, s: Length) -> [Float; 2] {
-        let pos = self.get_xy(s);
-        [pos.x.get::<meter>(), pos.y.get::<meter>()]
     }
 
     /// get a new Clothoid at this location along the current one
@@ -596,7 +620,7 @@ impl Clothoid {
 
         for (i, xys_i) in xys.iter_mut().take(NUM).enumerate() {
             let s: Length = i as Float * step;
-            *xys_i = self.get_xy_array_meter(s);
+            *xys_i = self.get_xy(s).as_array_meter();
         }
 
         xys
@@ -614,7 +638,7 @@ impl Clothoid {
 
         for i in 0..num {
             let s: Length = i as Float * step;
-            xys.push(self.get_xy_array_meter(s));
+            xys.push(self.get_xy(s).as_array_meter());
         }
 
         xys
