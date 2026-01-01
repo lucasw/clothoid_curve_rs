@@ -249,8 +249,9 @@ impl eframe::App for PlotCurve {
                 Length::new::<meter>(self.length),
             );
 
-            (self.curve_point_closest, self.curve_s_closest) = curve.get_nearest(&self.mouse_point, self.curve_s_closest);
-            ui.label(format!("Cursor position: x={:.1}, y={:.1}, {:?} {:.3}",
+            let iterations;
+            (self.curve_point_closest, self.curve_s_closest, iterations) = curve.get_nearest(&self.mouse_point, self.curve_s_closest);
+            ui.label(format!("{iterations} iterations, Cursor position: x={:.1}, y={:.1}, {:?} {:.3}",
                 self.mouse_point.x.get::<meter>(),
                 self.mouse_point.y.get::<meter>(),
                 self.curve_point_closest,
@@ -353,6 +354,11 @@ impl eframe::App for PlotCurve {
                             y: Length::new::<meter>(pos.y),
                         };
                     }
+                    // points
+                    plot_ui.points(Points::new(vec![
+                        self.curve_point_closest.as_array_meter(),
+                    ]).radius(5.0));
+                    /*
                     plot_ui.line(Line::new(vec![
                             [self.mouse_point.x.get::<meter>(),
                              self.mouse_point.y.get::<meter>(),
@@ -361,6 +367,7 @@ impl eframe::App for PlotCurve {
                              self.curve_point_closest.y.get::<meter>(),
                             ]
                     ]).name("closest point").style(LineStyle::dotted_loose()));
+                    */
                 });
         });
     }

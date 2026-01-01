@@ -656,16 +656,41 @@ impl Clothoid {
     }
 
     /// TODO(lucasw) replace with more efficient search- argmin isn't no_std though
-    /// find the nearest point on the clothoid to the provided point
+    /// find the closest/nearest point on the clothoid to the provided point
     /// s0 initial position on curve to start searching from
-    /// return the s & xy location
-    pub fn get_nearest(&self, pt: &Position, s0: Length) -> (Position, Length) {
-        let num = 16;
-        let step = self.length / (4.0 * num as Float);
-        let (_p_min, s) = self.get_nearest_with_step(pt, s0, step, num);
-        self.get_nearest_with_step(pt, s, step / (num as Float), num)
+    /// return the s & xy location, and number of iterations
+    pub fn get_nearest(&self, pt: &Position, s0: Length) -> (Position, Length, usize) {
+        // use rustamath_mnmz::brent_search;
+        use rustamath_mnmz::golden_section_search;
+
+        // TODO(lucasw) f32 brent_search?
+        let cost_fn = |s: f64| -> f64 {
+            let p = self.get_xy(Length::new::<meter>(s as Float));
+            Self::dist_sq(pt, &p).get::<square_meter>() as f64
+        };
+        let s0 = s0.get::<meter>() as f64;
+        let max_len = self.length.get::<meter>() as f64;
+        // TODO(lucasw) the underlying speed of the phenomena
+        // causing s to change from the previous value (if that's what is being fed
+        // in as an initial value governs what these should be- they could be tighter
+        // if the initial value can be a better guess (e.g. a known rate of change
+        // is added to the previous solution)
+        let bracket_a = (s0 - 1.0).clamp(0.0, max_len);
+        let bracket_b = (s0 + 1.0).clamp(0.0, max_len);
+        let tolerance = 0.001;
+        let max_iterations = 30;
+        // TODO(lucasw) longer curves that exceed pi radians
+        // with more curvature rate don't work as well,  it'll get stuck in a spiral
+        // let (s_min, _cost_at_min, iterations) = brent_search(cost_fn, bracket_a, bracket_b, tolerance, max_iterations);
+        let (s_min, _cost_at_min, iterations) = golden_section_search(cost_fn, bracket_a, bracket_b, tolerance, max_iterations);
+
+        let s_min = s_min.clamp(0.0, max_len);
+        let s = Length::new::<meter>(s_min as Float);
+        let p = self.get_xy(s);
+        (p, s, iterations)
     }
 
+    /// linear search
     pub fn get_nearest_with_step(&self, pt: &Position, s0: Length, fr: Length, num: usize) -> (Position, Length) {
         let p0 = self.get_xy(s0);
         let dist_sq0 = Self::dist_sq(pt, &p0);
