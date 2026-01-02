@@ -1,5 +1,5 @@
-// this doesn't have to be no_std, but with no-default-features it should be no_std compatible
-#![no_std]
+// only use no_std when not testing and no feature flag std
+#![cfg_attr(not(feature = "std"), cfg_attr(not(test), no_std))]
 
 use core::include;
 pub mod f32 {

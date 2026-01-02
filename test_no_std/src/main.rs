@@ -1,6 +1,3 @@
-// TODO(lucasw) maybe redundant with lib.rs
-#![no_std]
-
 use clothoid_bezier::f64::ClothoidBezierApproximation;
 use clothoid_curve::f64::{Clothoid, Position};
 
@@ -19,6 +16,9 @@ fn main() {
     };
     let clothoid = cd.to_clothoid();
 
-    let pt = Position { x: Length::new::<meter>(2.0), y: Length::new::<meter>(1.0) };
-    let (_pos, _distance, _iterations) = clothoid.get_nearest(&pt, Length::zero());
+    let pt = Position {
+        x: Length::new::<meter>(2.0),
+        y: Length::new::<meter>(1.0),
+    };
+    let (_pos, _s, _distance, _iterations) = clothoid.get_nearest(&pt, Length::zero());
 }

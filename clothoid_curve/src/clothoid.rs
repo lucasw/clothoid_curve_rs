@@ -682,11 +682,12 @@ impl Clothoid {
         dx * dx + dy * dy
     }
 
-    /// TODO(lucasw) replace with more efficient search- argmin isn't no_std though
     /// find the closest/nearest point on the clothoid to the provided point
     /// s0 initial position on curve to start searching from
-    /// return the s & xy location, and number of iterations
-    pub fn get_nearest(&self, pt: &Position, s0: Length) -> (Position, Length, usize) {
+    /// return the xy location, s distance along curve, distance to point, and number of iterations
+    #[cfg(feature = "std")]
+    pub fn get_nearest(&self, pt: &Position, s0: Length) -> (Position, Length, Length, usize) {
+        // argmin isn't no_std so trying brent_search
         // use rustamath_mnmz::brent_search;
         use rustamath_mnmz::golden_section_search;
 
@@ -709,12 +710,13 @@ impl Clothoid {
         // TODO(lucasw) longer curves that exceed pi radians
         // with more curvature rate don't work as well,  it'll get stuck in a spiral
         // let (s_min, _cost_at_min, iterations) = brent_search(cost_fn, bracket_a, bracket_b, tolerance, max_iterations);
-        let (s_min, _cost_at_min, iterations) = golden_section_search(cost_fn, bracket_a, bracket_b, tolerance, max_iterations);
+        let (s_min, distance_min, iterations) = golden_section_search(cost_fn, bracket_a, bracket_b, tolerance, max_iterations);
 
         let s_min = s_min.clamp(0.0, max_len);
         let s = Length::new::<meter>(s_min as Float);
+        let distance = Length::new::<meter>(distance_min as Float);
         let p = self.get_xy(s);
-        (p, s, iterations)
+        (p, s, distance, iterations)
     }
 
     /// linear search
@@ -767,6 +769,7 @@ mod tests {
         let pts0 = c0.get_points::<NUM>();
         assert_eq!(pts0.len(), NUM);
 
+        // redundant, std is set for tests
         #[cfg(feature = "std")]
         {
             let pts1 = c0.get_points_num(NUM);
@@ -779,6 +782,17 @@ mod tests {
                 assert_eq!(p0[1], p1[1]);
             }
         }
+
+        let pt = Position { x: Length::new::<meter>(2.0), y: Length::new::<meter>(1.0) };
+        let (pos, s, distance, iterations) = c0.get_nearest(&pt, Length::zero());
+        // TODO(lucasw) use assert float eq
+        assert!((pos.x.get::<meter>() - 1.0).abs() < 0.001);
+        assert!((pos.y.get::<meter>() - 1.0).abs() < 0.001);
+        assert!((distance.get::<meter>() - 1.0).abs() < 0.001);
+        println!("{pos:?}");
+        println!("{s:?}");
+        println!("{distance:?}");
+        println!("{iterations:?}");
     }
 
     #[test]

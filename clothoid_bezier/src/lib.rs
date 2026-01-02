@@ -5,7 +5,8 @@ December 2025
 
 show how well a set of bezier curves can approximate a clothoid curve
 */
-#![no_std]
+// set no_std when not testing and not using argmin_fit
+#![cfg_attr(not(feature = "argmin_fit"), cfg_attr(not(test), no_std))]
 
 use tinyvec::ArrayVec;
 // export common types at crate root
