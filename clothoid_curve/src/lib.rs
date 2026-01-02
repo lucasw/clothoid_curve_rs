@@ -15,6 +15,16 @@ pub mod f32 {
     use uom::si::f32::{Angle, Area, Curvature, Length, V};
 
     include!("clothoid.rs");
+
+    impl Position {
+        pub fn to_f64(&self) -> f64::Position {
+            f64::Position {
+                // TODO(lucasw) it would be nice if uom provided these
+                x: uom::si::f64::Length::new::<meter>(self.x.get::<meter>() as f64),
+                y: uom::si::f64::Length::new::<meter>(self.y.get::<meter>() as f64),
+            }
+        }
+    }
 }
 
 pub mod f64 {
@@ -54,8 +64,17 @@ pub mod f64 {
         }
     }
     */
-
     include!("clothoid.rs");
+
+    impl Position {
+        pub fn to_f32(&self) -> f32::Position {
+            f32::Position {
+                // TODO(lucasw) it would be nice if uom provided these
+                x: uom::si::f32::Length::new::<meter>(self.x.get::<meter>() as f32),
+                y: uom::si::f32::Length::new::<meter>(self.y.get::<meter>() as f32),
+            }
+        }
+    }
 }
 
 #[cfg(test)]

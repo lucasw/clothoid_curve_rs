@@ -46,7 +46,7 @@ impl Curve {
         target_curvature: Curvature,
     ) -> Self {
         Self {
-            xy0: clothoid0.xy0.clone(),
+            xy0: clothoid0.xy0,
             theta0: clothoid0.theta0,
             curvature0: clothoid0.curvature(),
             target_theta,

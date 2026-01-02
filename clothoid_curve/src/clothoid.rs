@@ -15,6 +15,9 @@ use core::cmp::PartialEq;
 use core::iter::Iterator;
 use core::default::Default;
 use core::prelude::rust_2024::derive;
+use core::ops::Neg;
+
+use serde::{Deserialize, Serialize};
 
 use typenum::{N2, Z0};
 use uom::si::marker::AngleKind;
@@ -61,10 +64,22 @@ pub fn curvature_per_meter_float(cpl: CurvaturePerLength) -> Float {
 }
 //}
 
-#[derive(Clone, Debug, Default, PartialEq)]
+// TODO(lucasw) put Position in a different file
+#[derive(Default, Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Position {
     pub x: Length,
     pub y: Length,
+}
+
+impl Neg for Position {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self {
+            x: -self.x,
+            y: -self.y,
+        }
+    }
 }
 
 impl Position {
@@ -77,6 +92,18 @@ impl Position {
 
     pub fn as_array_meter(&self) -> [Float; 2] {
         [self.x.get::<meter>(), self.y.get::<meter>()]
+    }
+}
+
+// TODO(lucasw) 'the method `clamp` exists for struct `Quantity<..., ..., f64>`, but its trait
+// bounds were not satisfied'
+pub fn curvature_clamp(curvature: Curvature, min: Curvature, max: Curvature) -> Curvature {
+    if curvature > max {
+        max
+    } else if curvature < min {
+        min
+    } else {
+        curvature
     }
 }
 
@@ -666,17 +693,17 @@ impl Clothoid {
         // TODO(lucasw) f32 brent_search?
         let cost_fn = |s: f64| -> f64 {
             let p = self.get_xy(Length::new::<meter>(s as Float));
-            Self::dist_sq(pt, &p).get::<square_meter>() as f64
+            Self::dist_sq(pt, &p).get::<square_meter>().into()
         };
-        let s0 = s0.get::<meter>() as f64;
-        let max_len = self.length.get::<meter>() as f64;
+        let s0: f64 = s0.get::<meter>().into();
+        let max_len: f64 = self.length.get::<meter>().into();
         // TODO(lucasw) the underlying speed of the phenomena
         // causing s to change from the previous value (if that's what is being fed
         // in as an initial value governs what these should be- they could be tighter
         // if the initial value can be a better guess (e.g. a known rate of change
         // is added to the previous solution)
-        let bracket_a = (s0 - 1.0).clamp(0.0, max_len);
-        let bracket_b = (s0 + 1.0).clamp(0.0, max_len);
+        let bracket_a: f64 = (s0 - 1.0).clamp(0.0, max_len);
+        let bracket_b: f64 = (s0 + 1.0).clamp(0.0, max_len);
         let tolerance = 0.001;
         let max_iterations = 30;
         // TODO(lucasw) longer curves that exceed pi radians

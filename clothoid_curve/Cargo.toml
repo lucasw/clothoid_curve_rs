@@ -14,5 +14,6 @@ std = []
 # TODO(lucasw) only use libm when no using std
 libm = "0.2.8"
 rustamath_mnmz = "0.1.1"
+serde.workspace = true
 typenum = "1.19.0"
-uom = "0.37.0"
+uom.workspace = true

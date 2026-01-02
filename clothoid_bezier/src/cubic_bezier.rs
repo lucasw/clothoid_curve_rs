@@ -5,6 +5,7 @@ use super::LineSegment;
 use super::QuadraticBezier;
 use super::*;
 use uom::si::{
+    angle::radian,
     curvature::radian_per_meter,
     length::meter,
 };
@@ -23,11 +24,11 @@ fn point2_to_position(p: PointN<2>) -> Position {
 
 // TODO(lucasw) can I avoid the redundant sizes?
 type CubicBezier2Base = CubicBezier::<PointN<2>, 2>;
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CubicBezier2(CubicBezier2Base);
 
 #[derive(Clone, Copy)]
-pub struct ParametricTFrac(NativeFloat);
+pub struct ParametricTFrac(pub NativeFloat);
 
 impl ParametricTFrac {
     pub fn start() -> Self {
@@ -89,8 +90,16 @@ impl CubicBezier2 {
         Length::new::<meter>(self.0.arclen_castlejau(None))
     }
 
+    /// TODO(lucasw) make sure in caller that the length of parametric_t isn't already known
+    /// don't want to compute it again
+    pub fn parametric_to_euclidean_t(&self, parametric_t: ParametricTFrac, bezier_length: Length) -> EuclideanTFrac {
+        let (left, _right) = self.0.split(parametric_t.0);
+        EuclideanTFrac(left.arclen_castlejau(None) / bezier_length.get::<meter>())
+    }
+
     /// require the length be computed elsehwere, though may want to optionally have a cached
     /// length to use after computing it the first time
+    /// TODO(lucasw) return the position as well?
     pub fn euclidean_to_parametric_t(&self, euclidean_t: EuclideanTFrac, bezier_length: Length) -> (Length, ParametricTFrac) {
         let desired_length = euclidean_t.0 * bezier_length;
         let (achieved_len, parametric_tfrac) = self.0.desired_len_to_parametric_t(desired_length.get::<meter>(), None);
@@ -102,8 +111,23 @@ impl CubicBezier2 {
         point2_to_position(self.0.eval(t.0))
     }
 
+    /// return angle and cos, sin components of angle so they needn't be recomputed
+    pub fn tangent(&self, t: ParametricTFrac) -> (Angle, (NativeFloat, NativeFloat)) {
+        let yaw_cos_sin = self.0.tangent(t.0);
+        let yaw_cos_sin = (yaw_cos_sin.axis(0), yaw_cos_sin.axis(1));
+        let yaw = Angle::new::<radian>(atan2(yaw_cos_sin.1, yaw_cos_sin.0));
+        (yaw, yaw_cos_sin)
+    }
+
     pub fn curvature(&self, t: ParametricTFrac) -> Curvature {
         Curvature::new::<radian_per_meter>(self.0.curvature(t.0))
+    }
+
+    // TODO(lucasw) also return the s distance along curve at the given t?  No
+    // the function to find the closest doesn't need that value
+    pub fn closest_to_point(&self, point: &Position) -> (Position, ParametricTFrac, Length) {
+        let (position_on_curve, parametric_t, distance) = self.0.closest_to_point(position_to_point2(point));
+        (point2_to_position(position_on_curve), ParametricTFrac(parametric_t), Length::new::<meter>(distance))
     }
 }
 
@@ -320,6 +344,7 @@ where
 
     /// Return the tangent at position t
     pub fn tangent(&self, t: NativeFloat) -> P {
+        // normalize the derivative
         let derivative = self.derivative().eval(t);
         let d_len = sqrt(derivative.squared_length());
         let scale = 1.0 / d_len;
@@ -365,7 +390,7 @@ where
 
     fn capture_closest(
         closest_point_on_curve: &mut P,
-        tmin: &mut NativeFloat,
+        tmin: &mut NativeFloat, // TODO(lucasw) ParametricTFrac,
         dmin: &mut NativeFloat,
         candidate_on_curve: &P,
         t: NativeFloat,
