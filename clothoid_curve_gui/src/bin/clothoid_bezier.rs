@@ -5,7 +5,7 @@ December 2025
 
 show how well a set of bezier curves can approximate a clothoid curve
 */
-use clothoid_bezier::f64::ClothoidBezierApproximation;
+use clothoid_bezier::f64::{cubic_bezier::EuclideanTFrac, ClothoidBezierApproximation};
 use egui::{CentralPanel, Color32, Stroke, TopBottomPanel};
 use egui_plot::{Legend, Line, Points};
 use std::f64::consts::PI;
@@ -206,7 +206,7 @@ impl eframe::App for ClothoidToBezier {
 
                         let mut bezier_pts = Vec::new();
                         for i in 0..num_pts {
-                            let desired_euclidean_tfrac = i as f64 * fr;
+                            let desired_euclidean_tfrac = EuclideanTFrac(i as f64 * fr);
                             let (bezier_s_distance, parametric_tfrac) = bezier
                                 .euclidean_to_parametric_t(desired_euclidean_tfrac, bezier_length);
                             let achieved_euclidean_tfrac = bezier_s_distance / bezier_length;

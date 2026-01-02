@@ -39,6 +39,20 @@ impl ParametricTFrac {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+// #[repr(transparent)]
+pub struct EuclideanTFrac(pub NativeFloat);
+
+impl EuclideanTFrac {
+    pub fn start() -> Self {
+        Self(0.0)
+    }
+
+    pub fn end() -> Self {
+        Self(1.0)
+    }
+}
+
 impl CubicBezier2 {
     pub fn new(start: &Position, ctrl1: &Position, ctrl2: &Position, end: &Position) -> Self {
         // TODO(lucasw) optionally cache length?
@@ -77,8 +91,8 @@ impl CubicBezier2 {
 
     /// require the length be computed elsehwere, though may want to optionally have a cached
     /// length to use after computing it the first time
-    pub fn euclidean_to_parametric_t(&self, euclidean_t: NativeFloat, bezier_length: Length) -> (Length, ParametricTFrac) {
-        let desired_length = euclidean_t * bezier_length;
+    pub fn euclidean_to_parametric_t(&self, euclidean_t: EuclideanTFrac, bezier_length: Length) -> (Length, ParametricTFrac) {
+        let desired_length = euclidean_t.0 * bezier_length;
         let (achieved_len, parametric_tfrac) = self.0.desired_len_to_parametric_t(desired_length.get::<meter>(), None);
         // TODO(lucasw) also return achieved_len / bezier_length as achieved_euclidean_t?
         (Length::new::<meter>(achieved_len), ParametricTFrac(parametric_tfrac))
