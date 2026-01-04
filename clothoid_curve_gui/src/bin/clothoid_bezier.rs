@@ -207,15 +207,15 @@ impl eframe::App for ClothoidToBezier {
                         let mut bezier_pts = Vec::new();
                         for i in 0..num_pts {
                             let desired_euclidean_tfrac = EuclideanTFrac(i as f64 * fr);
-                            let (bezier_s_distance, parametric_tfrac) = bezier
+                            let (achieved_euclidean_tfrac, parametric_tfrac) = bezier
                                 .euclidean_to_parametric_t(desired_euclidean_tfrac, bezier_length);
-                            let achieved_euclidean_tfrac = bezier_s_distance / bezier_length;
+                            let bezier_s_distance = achieved_euclidean_tfrac.0 * bezier_length;
                             let pt = bezier.eval(parametric_tfrac);
                             bezier_pts.push(pt.as_array_meter());
 
                             // this will be increasingly different from bezier s_distance
                             // the more the two curves differ in length
-                            let clothoid_s_distance = achieved_euclidean_tfrac * clothoid.length;
+                            let clothoid_s_distance = achieved_euclidean_tfrac.0 * clothoid.length;
                             let cpt = clothoid.get_clothoid(clothoid_s_distance);
                             let ex = pt.x - cpt.xy0.x;
                             let ey = pt.y - cpt.xy0.y;

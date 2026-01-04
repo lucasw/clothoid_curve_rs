@@ -100,11 +100,13 @@ impl CubicBezier2 {
     /// require the length be computed elsehwere, though may want to optionally have a cached
     /// length to use after computing it the first time
     /// TODO(lucasw) return the position as well?
-    pub fn euclidean_to_parametric_t(&self, euclidean_t: EuclideanTFrac, bezier_length: Length) -> (Length, ParametricTFrac) {
+    pub fn euclidean_to_parametric_t(&self, euclidean_t: EuclideanTFrac, bezier_length: Length) -> (EuclideanTFrac, ParametricTFrac) {
         let desired_length = euclidean_t.0 * bezier_length;
         let (achieved_len, parametric_tfrac) = self.0.desired_len_to_parametric_t(desired_length.get::<meter>(), None);
-        // TODO(lucasw) also return achieved_len / bezier_length as achieved_euclidean_t?
-        (Length::new::<meter>(achieved_len), ParametricTFrac(parametric_tfrac))
+        // TODO(lucasw) also return
+        let achieved_euclidean_tfrac: NativeFloat = achieved_len / bezier_length.get::<meter>();
+        // (Length::new::<meter>(achieved_len), ParametricTFrac(parametric_tfrac))
+        (EuclideanTFrac(achieved_euclidean_tfrac), ParametricTFrac(parametric_tfrac))
     }
 
     pub fn eval(&self, t: ParametricTFrac) -> Position {
@@ -275,6 +277,9 @@ where
     // return the achieved length (which may be slightly off desired) and the parametric t value
     // that resulted in it
     pub fn desired_len_to_parametric_t(&self, desired_len: NativeFloat, tolerance: Option<NativeFloat>) -> (NativeFloat, NativeFloat) {
+        if desired_len == 0.0 {
+            return (0.0, 0.0);
+        }
         let start_level = 0;
         let min_level = 4;
         let (len, parametric_t) = Self::recurse(self.start, self.ctrl1, self.ctrl2, self.end, Some(desired_len), tolerance.unwrap_or_default(), start_level, min_level);
@@ -692,6 +697,43 @@ mod tests {
     use super::*;
     use std::println;
     use core::f64::consts::PI;
+
+    #[test]
+    fn cubic_bezier2_euclidean_to_parametric() {
+        let bezier_len = 10.0;
+        let handle_len = 1.0;
+
+        // simple straight line
+        let cb = CubicBezier2::new(
+            &Position::from_array_meter([0.0, 0.0]),
+            &Position::from_array_meter([handle_len, 0.0]),
+            &Position::from_array_meter([bezier_len - handle_len, 0.0]),
+            &Position::from_array_meter([bezier_len, 0.0]),
+        );
+        let cb_length0 = cb.arclen(128);
+        assert!(
+            (cb_length0.get::<meter>() - bezier_len).abs() < 0.003 * bezier_len,
+            "{:?} {:?}", cb_length0, bezier_len,
+        );
+        let cb_length = cb.arclen_castlejau();
+        assert!(
+            (cb_length.get::<meter>() - bezier_len).abs() < 0.0000001 * bezier_len,
+            "{cb_length:?} {bezier_len}",
+        );
+
+        for t in [0.0, 0.05, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 0.9, 0.95, 1.0] {
+            let euclidean_t = EuclideanTFrac(t);
+            let (achieved_euclidean_t, parametric_t) = cb.euclidean_to_parametric_t(euclidean_t, cb_length);
+            assert!(
+                (euclidean_t.0 - achieved_euclidean_t.0).abs() < 0.09,
+                "{euclidean_t:?} {achieved_euclidean_t:?}, (-> parametric parametric {parametric_t:?})",
+                // (t * cb_length - achieved_len).get::<meter>().abs() < 0.01,
+                // "{t} * {cb_length:?} ({:?}) = {achieved_len:?}, parametric {parametric_t:?}", t * cb_length);
+            );
+            println!("{euclidean_t:?} {achieved_euclidean_t:?}, (-> parametric parametric {parametric_t:?})");
+        }
+    }
+
     #[test]
     fn circle_approximation_error() {
         // define closure for unit circle
