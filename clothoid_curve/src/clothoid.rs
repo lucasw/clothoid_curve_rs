@@ -757,7 +757,33 @@ mod tests {
     extern crate std;
     use super::*;
     use std::format;
+    use uom::si::angle::degree;
     use uom::si::curvature::radian_per_meter;
+
+    #[test]
+    fn set_angles() {
+        let curvature = Curvature::new::<radian_per_meter>(0.0);
+        let length: Length = Length::new::<meter>(10.0); // (PI / (curvature * 2.0)).into();
+        for angle_deg in [-180.0, -135.0, -90.0, -45.0, 0.0, 45.0, 90.0] {
+            let c0 = Clothoid::create(Length::zero(), Length::zero(), Angle::new::<degree>(angle_deg), curvature, CurvaturePerLength::zero(), length);
+
+            let dist = 0.0;
+            assert!((c0.theta0 - Angle::new::<degree>(angle_deg)).abs().get::<radian>() < 0.001, "{dist}m angle deg {} {}", c0.theta0.get::<degree>(), angle_deg);
+            let expected_cos = c0.theta0.get::<radian>().cos();
+            assert!((c0.cos_theta0 - expected_cos).abs() < 0.0001, "{dist}m {angle_deg} cos {:.6}, expected {:.6}", c0.cos_theta0, expected_cos);
+            let expected_sin = c0.theta0.get::<radian>().sin();
+            assert!((c0.sin_theta0 - expected_sin).abs() < 0.0001, "{dist}m {angle_deg} sin {:.6}, expected {:.6}", c0.sin_theta0, expected_sin);
+
+            for dist in [-1.0, 0.0, 1.0] {
+                let c0 = c0.get_clothoid(Length::new::<meter>(dist));
+                assert!((c0.theta0 - Angle::new::<degree>(angle_deg)).abs().get::<radian>() < 0.001, "{dist}m angle deg {} {}", c0.theta0.get::<degree>(), angle_deg);
+                let expected_cos = c0.theta0.get::<radian>().cos();
+                assert!((c0.cos_theta0 - expected_cos).abs() < 0.0001, "{dist}m {angle_deg} cos {:.6}, expected {:.6}", c0.cos_theta0, expected_cos);
+                let expected_sin = c0.theta0.get::<radian>().sin();
+                assert!((c0.sin_theta0 - expected_sin).abs() < 0.0001, "{dist}m {angle_deg} sin {:.6}, expected {:.6}", c0.sin_theta0, expected_sin);
+            }
+        }
+    }
 
     #[test]
     fn get_points() {
