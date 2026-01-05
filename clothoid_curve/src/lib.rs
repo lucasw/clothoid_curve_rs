@@ -7,12 +7,9 @@ pub mod f32 {
 
     pub type Float = f32;
     use core::f32::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
-    // TODO(lucasw) if std is available use std trig functions
-    use libm::atan2f as atan2;
-    use libm::cosf as cos;
-    use libm::floorf as floor;
-    use libm::sinf as sin;
-    use libm::sqrtf as sqrt;
+    // if std is available use std trig functions, they'll be faster/more accurate
+    #[cfg(not(feature = "std"))]
+    use libm::{atan2f as atan2, cosf as cos, floorf as floor, sinf as sin, sqrtf as sqrt};
 
     use uom::si::f32::{Angle, Area, Curvature, Length, V};
 
@@ -34,11 +31,8 @@ pub mod f64 {
 
     pub type Float = f64;
     use core::f64::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
-    use libm::atan2;
-    use libm::cos;
-    use libm::floor;
-    use libm::sin;
-    use libm::sqrt;
+    #[cfg(not(feature = "std"))]
+    use libm::{atan2, cos, floor, sin, sqrt};
 
     use uom::si::f64::{Angle, Area, Curvature, Length, V};
 

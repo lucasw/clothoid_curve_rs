@@ -29,6 +29,36 @@ use uom::si::{
     length::meter,
 };
 
+// TODO(lucasw) put into block
+#[cfg(feature = "std")]
+fn atan2(x: Float, y: Float) -> Float {
+    x.atan2(y)
+}
+
+#[cfg(feature = "std")]
+fn sin(x: Float) -> Float {
+    // TODO(lucasw) cargo test && cargo test --no-default-features
+    // want to make sure the latter isn't using this sin function, is actually testing
+    // the libm sin()
+    // println!("#################################################using println");
+    x.sin()
+}
+
+#[cfg(feature = "std")]
+fn cos(x: Float) -> Float {
+    x.cos()
+}
+
+#[cfg(feature = "std")]
+fn floor(x: Float) -> Float {
+    x.floor()
+}
+
+#[cfg(feature = "std")]
+fn sqrt(x: Float) -> Float {
+    x.sqrt()
+}
+
 /// put angle into -pi, pi range
 pub fn angle_unwrap(angle: Angle) -> Angle {
     Angle::new::<radian>((angle.get::<radian>() + PI) % (2.0 * PI) - PI)

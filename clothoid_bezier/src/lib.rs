@@ -18,7 +18,7 @@ pub mod f32 {
     const EPSILON: core::primitive::f32 = core::primitive::f32::EPSILON;
 
     // use clothoid_curve::f32::curvature_per_meter;
-    use clothoid_curve::f32::{Position};
+    use clothoid_curve::f32::Position;
 
     use core::f32::consts::PI;
 
