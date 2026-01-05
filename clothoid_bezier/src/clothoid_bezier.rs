@@ -66,9 +66,11 @@ impl ClothoidBezierApproximation {
         let x0 = 0.0;
         let y0 = 0.0;
         Clothoid::create(
-            Length::new::<meter>(x0),
-            Length::new::<meter>(y0),
-            Angle::zero(),
+            Position {
+                x: Length::new::<meter>(x0),
+                y: Length::new::<meter>(y0),
+            },
+            AngleCosSin::default(),
             Curvature::new::<radian_per_meter>(self.curvature),
             curvature_per_meter(self.curvature_rate),
             Length::new::<meter>(self.length),

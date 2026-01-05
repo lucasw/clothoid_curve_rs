@@ -7,6 +7,8 @@ pub mod f32 {
 
     pub type Float = f32;
     use core::f32::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
+    // TODO(lucasw) if std is available use std trig functions
+    use libm::atan2f as atan2;
     use libm::cosf as cos;
     use libm::floorf as floor;
     use libm::sinf as sin;
@@ -32,6 +34,7 @@ pub mod f64 {
 
     pub type Float = f64;
     use core::f64::consts::{FRAC_2_SQRT_PI, FRAC_PI_2, PI};
+    use libm::atan2;
     use libm::cos;
     use libm::floor;
     use libm::sin;

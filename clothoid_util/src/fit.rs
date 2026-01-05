@@ -16,7 +16,7 @@ use argmin::{
 #[allow(unused_imports)]
 use argmin_observer_slog::SlogLogger;
 use clothoid_curve::f64::{
-    Clothoid, CurvaturePerLength, Position, angle_unwrap, curvature_per_meter,
+    AngleCosSin, Clothoid, CurvaturePerLength, Position, angle_unwrap, curvature_per_meter,
     curvature_per_meter_float,
 };
 use finitediff::FiniteDiff;
@@ -26,23 +26,23 @@ use uom::si::{
     angle::{degree, radian},
     area::square_meter,
     curvature::radian_per_meter,
-    f64::{Angle, Curvature, Length},
+    f64::{Curvature, Length},
     length::meter,
 };
 
 #[derive(Clone)]
 struct Curve {
     xy0: Position,
-    theta0: Angle,
+    theta0: AngleCosSin,
     curvature0: Curvature,
-    target_theta: Angle,
+    target_theta: AngleCosSin,
     target_curvature: Curvature,
 }
 
 impl Curve {
     fn from_clothoid(
         clothoid0: &Clothoid,
-        target_theta: Angle,
+        target_theta: AngleCosSin,
         target_curvature: Curvature,
     ) -> Self {
         Self {
@@ -56,8 +56,7 @@ impl Curve {
 
     fn to_clothoid(&self, curvature_rate: CurvaturePerLength, length: Length) -> Clothoid {
         Clothoid::create(
-            self.xy0.x,
-            self.xy0.y,
+            self.xy0,
             self.theta0,
             self.curvature0,
             curvature_rate,
@@ -71,7 +70,7 @@ impl Curve {
         let curve_s = curve0.get_clothoid(length);
         // println!("curvature rates {} -> {}",  curve0.curvature_rate(), curve_s.curvature_rate());
         // println!("curvature {} -> {}",  curve0.curvature(), curve_s.curvature());
-        let d_yaw = self.target_theta - curve_s.get_start_theta();
+        let d_yaw = self.target_theta.angle - curve_s.get_start_theta().angle;
         // println!("d_yaw: {d_yaw}");
         let d_yaw = angle_unwrap(d_yaw).get::<radian>();
         // println!("unwrapped d_yaw: {d_yaw}");
@@ -113,7 +112,7 @@ impl Gradient for Curve {
 
 pub fn find_clothoid(
     clothoid0: Clothoid, // initial conditions, curvature_rate and length are initial guess
-    target_theta: Angle,
+    target_theta: AngleCosSin,
     target_curvature: Curvature,
 ) -> Result<Clothoid, Error> {
     // Define cost function (must implement `CostFunction` and `Gradient`)
@@ -172,8 +171,7 @@ pub fn find_clothoid(
     // TODO(lucasw) length needs to be > 0
     let length = Length::new::<meter>(param[1]);
     let curve_solution = Clothoid::create(
-        cost.xy0.x,
-        cost.xy0.y,
+        cost.xy0,
         cost.theta0,
         cost.curvature0,
         curvature_rate,

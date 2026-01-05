@@ -95,6 +95,50 @@ impl Position {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+pub struct AngleCosSin {
+    pub angle: Angle,
+    pub cos: Float,
+    pub sin: Float,
+}
+
+impl Default for AngleCosSin {
+    fn default() -> Self {
+        Self {
+            angle: Angle::zero(),
+            cos: 1.0,
+            sin: 0.0,
+        }
+    }
+}
+
+impl AngleCosSin {
+    pub fn from_angle(angle: Angle) -> Self {
+        Self {
+            angle,
+            cos: cos(angle.get::<radian>()),
+            sin: sin(angle.get::<radian>()),
+        }
+    }
+
+    pub fn from_cos_sin(angle_cos: Float, angle_sin: Float) -> Self {
+        let angle = Angle::new::<radian>(atan2(angle_sin, angle_cos));
+        Self {
+            angle,
+            cos: angle_cos,
+            sin: angle_sin,
+        }
+    }
+
+    pub fn get<T>(&self) -> Float
+    where
+        // N: uom::si::Unit + uom::Conversion<V, T = V::T>,
+        T: uom::si::angle::Unit + uom::Conversion<Float, T = Float>
+    {
+        self.angle.get::<T>()
+    }
+}
+
 // TODO(lucasw) 'the method `clamp` exists for struct `Quantity<..., ..., f64>`, but its trait
 // bounds were not satisfied'
 pub fn curvature_clamp(curvature: Curvature, min: Curvature, max: Curvature) -> Curvature {
@@ -107,35 +151,18 @@ pub fn curvature_clamp(curvature: Curvature, min: Curvature, max: Curvature) -> 
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Default, PartialEq)]
 pub struct Clothoid {
     /// start point xy
     pub xy0: Position,
     /// start point theta/yaw/heading
-    pub theta0: Angle,
-    /// cached cos and sin of theta
-    pub cos_theta0: Float,
-    pub sin_theta0: Float,
+    pub theta0: AngleCosSin,
     kappa0: Curvature,     // start point curvature 1/r
     dk: CurvaturePerLength, // curvature rate, how much curvature changes per unit length, end theta will be
     // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
     // theta(s) = theta + kappa0 * s + 1/2 * dk * s^2
     // with s = length
     pub length: Length, // how long the curve is (end kappa will be length * dk)
-}
-
-impl Default for Clothoid {
-    fn default() -> Self {
-        Self {
-            xy0: Position::default(),
-            theta0: Angle::zero(),
-            cos_theta0: 1.0,
-            sin_theta0: 0.0,
-            kappa0: Curvature::zero(),
-            dk: CurvaturePerLength::zero(),
-            length: Length::zero(),
-        }
-    }
 }
 
 /*
@@ -533,7 +560,7 @@ fn eval_xy_a_large(a: Float, b: Float) -> (Float, Float) {
 }
 
 // let (f_c, f_s) = fresnel_cs3(self.curvature_rate() * s * s, self.curvature() * s, self.theta0);
-fn fresnel_cs3(a: Float, b: Float, c: Angle) -> (Float, Float) {
+fn fresnel_cs3(a: Float, b: Float, c: AngleCosSin) -> (Float, Float) {
     let threshold = 0.01;
     let a_series_size = 3;
     let xx: Float;
@@ -546,11 +573,8 @@ fn fresnel_cs3(a: Float, b: Float, c: Angle) -> (Float, Float) {
         (xx, yy) = eval_xy_a_large(a, b);
     };
 
-    let cosc = cos(c.get::<radian>());
-    let sinc = sin(c.get::<radian>());
-
-    let int_c = xx * cosc - yy * sinc;
-    let int_s = xx * sinc + yy * cosc;
+    let int_c = xx * c.cos - yy * c.sin;
+    let int_s = xx * c.sin + yy * c.cos;
     // println!("xx {:0.2}, yy {:0.2}, int_c {:0.2}, int_s {:0.2}", xx, yy, int_c, int_s);
 
     (int_c, int_s)
@@ -558,25 +582,22 @@ fn fresnel_cs3(a: Float, b: Float, c: Angle) -> (Float, Float) {
 
 impl Clothoid {
     pub fn create(
-        x0: Length,
-        y0: Length,
-        theta0: Angle,
+        pos: Position,
+        theta0: AngleCosSin,
         curvature0: Curvature,
         curvature_rate: CurvaturePerLength,
         length: Length,
     ) -> Self {
         Self {
-            xy0: Position { x: x0, y: y0 },
-            theta0: angle_unwrap(theta0),
-            cos_theta0: cos(theta0.get::<radian>()),
-            sin_theta0: sin(theta0.get::<radian>()),
+            xy0: pos,
+            theta0,
             kappa0: curvature0,
             dk: curvature_rate,
             length,
         }
     }
 
-    pub fn get_start_theta(&self) -> Angle {
+    pub fn get_start_theta(&self) -> AngleCosSin {
         self.theta0
     }
 
@@ -622,7 +643,7 @@ impl Clothoid {
         // https://github.com/ebertolazzi/Clothoids/blob/master/src/Clothoids/Fresnel.hxx#L142
         // theta(s) = theta + theta' * s + 1/2 * theta0'' * s^2
         let delta_curvature_s: Curvature = (s * self.curvature_rate()).into();
-        let theta_s = self.theta0 + Angle::new::<radian>(
+        let theta_s = self.theta0.angle + Angle::new::<radian>(
             (s * (self.curvature() + 0.5 * delta_curvature_s)).into()
         );
         let kappa_s = self.curvature() + delta_curvature_s; // curvature changes linearly with curvature_rate
@@ -632,9 +653,7 @@ impl Clothoid {
         let length = self.length;
         Self {
             xy0: xy_s,
-            theta0: angle_unwrap(theta_s),
-            cos_theta0: cos(theta_s.get::<radian>()),
-            sin_theta0: sin(theta_s.get::<radian>()),
+            theta0: AngleCosSin::from_angle(angle_unwrap(theta_s)),
             kappa0: kappa_s,
             dk: self.dk, // curvature rate is constant through the clothoid segment
             length,
@@ -765,22 +784,22 @@ mod tests {
         let curvature = Curvature::new::<radian_per_meter>(0.0);
         let length: Length = Length::new::<meter>(10.0); // (PI / (curvature * 2.0)).into();
         for angle_deg in [-180.0, -135.0, -90.0, -45.0, 0.0, 45.0, 90.0] {
-            let c0 = Clothoid::create(Length::zero(), Length::zero(), Angle::new::<degree>(angle_deg), curvature, CurvaturePerLength::zero(), length);
+            let c0 = Clothoid::create(Position::default(), AngleCosSin::from_angle(Angle::new::<degree>(angle_deg)), curvature, CurvaturePerLength::zero(), length);
 
             let dist = 0.0;
-            assert!((c0.theta0 - Angle::new::<degree>(angle_deg)).abs().get::<radian>() < 0.001, "{dist}m angle deg {} {}", c0.theta0.get::<degree>(), angle_deg);
+            assert!((c0.theta0.angle - Angle::new::<degree>(angle_deg)).abs().get::<radian>() < 0.001, "{dist}m angle deg {} {}", c0.theta0.get::<degree>(), angle_deg);
             let expected_cos = c0.theta0.get::<radian>().cos();
-            assert!((c0.cos_theta0 - expected_cos).abs() < 0.0001, "{dist}m {angle_deg} cos {:.6}, expected {:.6}", c0.cos_theta0, expected_cos);
+            assert!((c0.theta0.cos - expected_cos).abs() < 0.0001, "{dist}m {angle_deg} cos {:.6}, expected {:.6}", c0.theta0.cos, expected_cos);
             let expected_sin = c0.theta0.get::<radian>().sin();
-            assert!((c0.sin_theta0 - expected_sin).abs() < 0.0001, "{dist}m {angle_deg} sin {:.6}, expected {:.6}", c0.sin_theta0, expected_sin);
+            assert!((c0.theta0.sin - expected_sin).abs() < 0.0001, "{dist}m {angle_deg} sin {:.6}, expected {:.6}", c0.theta0.sin, expected_sin);
 
             for dist in [-1.0, 0.0, 1.0] {
                 let c0 = c0.get_clothoid(Length::new::<meter>(dist));
-                assert!((c0.theta0 - Angle::new::<degree>(angle_deg)).abs().get::<radian>() < 0.001, "{dist}m angle deg {} {}", c0.theta0.get::<degree>(), angle_deg);
+                assert!((c0.theta0.angle - Angle::new::<degree>(angle_deg)).abs().get::<radian>() < 0.001, "{dist}m angle deg {} {}", c0.theta0.get::<degree>(), angle_deg);
                 let expected_cos = c0.theta0.get::<radian>().cos();
-                assert!((c0.cos_theta0 - expected_cos).abs() < 0.0001, "{dist}m {angle_deg} cos {:.6}, expected {:.6}", c0.cos_theta0, expected_cos);
+                assert!((c0.theta0.cos - expected_cos).abs() < 0.0001, "{dist}m {angle_deg} cos {:.6}, expected {:.6}", c0.theta0.cos, expected_cos);
                 let expected_sin = c0.theta0.get::<radian>().sin();
-                assert!((c0.sin_theta0 - expected_sin).abs() < 0.0001, "{dist}m {angle_deg} sin {:.6}, expected {:.6}", c0.sin_theta0, expected_sin);
+                assert!((c0.theta0.sin - expected_sin).abs() < 0.0001, "{dist}m {angle_deg} sin {:.6}, expected {:.6}", c0.theta0.sin, expected_sin);
             }
         }
     }
@@ -789,7 +808,7 @@ mod tests {
     fn get_points() {
         let curvature = Curvature::new::<radian_per_meter>(1.0);
         let length: Length = (PI / (curvature * 2.0)).into();
-        let c0 = Clothoid::create(Length::zero(), Length::zero(), Angle::zero(), curvature, CurvaturePerLength::zero(), length);
+        let c0 = Clothoid::create(Position::default(), AngleCosSin::default(), curvature, CurvaturePerLength::zero(), length);
 
         const NUM: usize = 32;
         let pts0 = c0.get_points::<NUM>();
@@ -826,7 +845,7 @@ mod tests {
         // radius = 2.0
         let curvature = Curvature::new::<radian_per_meter>(0.5);
         let length = Length::new::<meter>(1.0);
-        let clothoid0 = Clothoid::create(Length::zero(), Length::zero(), Angle::zero(), curvature, CurvaturePerLength::zero(), length);
+        let clothoid0 = Clothoid::create(Position::default(), AngleCosSin::default(), curvature, CurvaturePerLength::zero(), length);
 
         // sample the clothoid at the end
         let clothoid1 = clothoid0.get_end_clothoid();

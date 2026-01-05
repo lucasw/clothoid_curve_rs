@@ -1,7 +1,9 @@
 /// Copyright 2024 Lucas Walter
 ///
 ///
-use clothoid_curve::f64::{Clothoid, CurvaturePerLength, Float, angle_unwrap};
+use clothoid_curve::f64::{
+    AngleCosSin, Clothoid, CurvaturePerLength, Float, Position, angle_unwrap,
+};
 use clothoid_util::fit::find_clothoid;
 
 use uom::num_traits::Zero;
@@ -20,14 +22,14 @@ fn main() {
     let target_theta: Float = args[3].parse().unwrap();
     let target_curvature: Float = args[4].parse().unwrap();
 
-    let theta0 = angle_unwrap(Angle::new::<radian>(theta0));
-    let target_theta = angle_unwrap(Angle::new::<radian>(target_theta));
+    let theta0 = AngleCosSin::from_angle(angle_unwrap(Angle::new::<radian>(theta0)));
+    let target_theta = AngleCosSin::from_angle(angle_unwrap(Angle::new::<radian>(target_theta)));
     let target_curvature = Curvature::new::<radian_per_meter>(target_curvature);
 
     let length_guess: Length = {
         if target_curvature != Curvature::zero() {
             // TODO(lucasw) The real quantity of clothoid length is radian meter
-            ((target_theta - theta0) / target_curvature) / Angle::new::<radian>(1.0)
+            ((target_theta.angle - theta0.angle) / target_curvature) / Angle::new::<radian>(1.0)
         } else {
             Length::new::<meter>(1.0)
         }
@@ -42,8 +44,7 @@ fn main() {
     );
 
     let clothoid0 = Clothoid::create(
-        Length::zero(),
-        Length::zero(),
+        Position::default(),
         theta0,
         curvature0,
         curvature_rate_guess,

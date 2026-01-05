@@ -1,7 +1,7 @@
 //! Adapted from egui custom_plot_manipulation example
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use clothoid_curve::f64::{curvature_per_meter, Clothoid, Position};
+use clothoid_curve::f64::{curvature_per_meter, AngleCosSin, Clothoid, Position};
 use clothoid_util::fit::find_clothoid;
 use eframe::egui::{self, DragValue, Event, Vec2};
 use egui_plot::{Legend, Line, LineStyle, PlotPoints, Points};
@@ -16,7 +16,7 @@ use uom::si::{
     length::meter,
 };
 
-type Target = (Clothoid, Angle, Curvature);
+type Target = (Clothoid, AngleCosSin, Curvature);
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -28,7 +28,11 @@ fn main() -> Result<(), eframe::Error> {
     // and then send back a solution curve periodically
     thread::spawn(move || {
         println!("solver threading running");
-        let mut last_target = (Clothoid::default(), Angle::zero(), Curvature::zero());
+        let mut last_target = (
+            Clothoid::default(),
+            AngleCosSin::default(),
+            Curvature::zero(),
+        );
         loop {
             thread::sleep(std::time::Duration::from_millis(50));
             // println!("waking");
@@ -241,9 +245,11 @@ impl eframe::App for PlotCurve {
             ui.label("Show a clothoid curve according to input controls, and also attempt to solve for desired curve end point angle and curvature given input curve initial conditions and only varying length and curvature_rate");
 
             let curve = Clothoid::create(
-                Length::new::<meter>(self.x0),
-                Length::new::<meter>(self.y0),
-                Angle::new::<radian>(self.theta0),
+                Position {
+                    x: Length::new::<meter>(self.x0),
+                    y: Length::new::<meter>(self.y0),
+                },
+                AngleCosSin::from_angle(Angle::new::<radian>(self.theta0)),
                 Curvature::new::<radian_per_meter>(self.kappa0),
                 curvature_per_meter(self.dk),
                 Length::new::<meter>(self.length),
@@ -331,7 +337,7 @@ impl eframe::App for PlotCurve {
                     // println!("sending new target {} {}", self.target_theta, self.target_kappa);
                     let _rv = self.target_sender.send((
                         curve.clone(),
-                        Angle::new::<radian>(self.target_theta),
+                        AngleCosSin::from_angle(Angle::new::<radian>(self.target_theta)),
                         Curvature::new::<radian_per_meter>(self.target_kappa),
                     ));
                     // println!("{rv:?}");
