@@ -87,7 +87,9 @@ impl CubicBezier2 {
 
     // TODO(lucasw) provide another fn with tolerance
     pub fn arclen_castlejau(&self) -> Length {
-        Length::new::<meter>(self.0.arclen_castlejau(None))
+        // TODO(lucasw) not clear if tolerance is doing anything, what the right
+        // value it should use
+        Length::new::<meter>(self.0.arclen_castlejau(None)) // Some(0.01)))
     }
 
     /// TODO(lucasw) make sure in caller that the length of parametric_t isn't already known
@@ -103,7 +105,6 @@ impl CubicBezier2 {
     pub fn euclidean_to_parametric_t(&self, euclidean_t: EuclideanTFrac, bezier_length: Length) -> (EuclideanTFrac, ParametricTFrac) {
         let desired_length = euclidean_t.0 * bezier_length;
         let (achieved_len, parametric_tfrac) = self.0.desired_len_to_parametric_t(desired_length.get::<meter>(), None);
-        // TODO(lucasw) also return
         let achieved_euclidean_tfrac: NativeFloat = achieved_len / bezier_length.get::<meter>();
         // (Length::new::<meter>(achieved_len), ParametricTFrac(parametric_tfrac))
         (EuclideanTFrac(achieved_euclidean_tfrac), ParametricTFrac(parametric_tfrac))
@@ -118,6 +119,7 @@ impl CubicBezier2 {
         let yaw_cos_sin = self.0.tangent(t.0);
         let yaw_cos_sin = (yaw_cos_sin.axis(0), yaw_cos_sin.axis(1));
         let yaw = Angle::new::<radian>(atan2(yaw_cos_sin.1, yaw_cos_sin.0));
+        // TODO(lucasw) return AngleCosSin
         (yaw, yaw_cos_sin)
     }
 
@@ -222,15 +224,17 @@ where
     /// either compute the full length of the curve, or find the parametric t that results
     /// in the desired length
     /// return length, parametric_t
-    fn recurse(a0: P, a1: P, a2: P, a3: P,
+    fn recurse(a_start: P, a_ctrl1: P, a_ctrl2: P, a_end: P,
             desired_len: Option<NativeFloat>, tolerance: NativeFloat, level: u8, min_level: u8) -> (NativeFloat, NativeFloat) {
         // TODO(lucasw) when the line is straight, these values are the same so this exits
         // immediately, but in that case the handles need to be 1/3 the line length to work
         // properly
         // But it looks like forcing this to recurse 4 times avoids this issue, but only
         // do that when computing parametric t, don't use it for computing arclen
-        let lower = a0.distance(&a3);
-        let upper = a0.distance(&a1) + a1.distance(&a2) + a2.distance(&a3);
+        // the shortest possible curve would be straight from the start to the end, and the longest
+        // would travel through each ctrl point- the real curve length lies between
+        let lower = a_start.distance(&a_end);
+        let upper = a_start.distance(&a_ctrl1) + a_ctrl1.distance(&a_ctrl2) + a_ctrl2.distance(&a_end);
         let in_tolerance = (upper - lower) <= (2. * tolerance);
         let over_level_threshold = level >= 8;
         if (in_tolerance || over_level_threshold) && level >= min_level {
@@ -246,13 +250,25 @@ where
             return (approx_len, parametric_t)
         }
 
-        let b1 = (a0 + a1) * 0.5;
-        let t0 = (a1 + a2) * 0.5;
-        let c1 = (a2 + a3) * 0.5;
-        let b2 = (b1 + t0) * 0.5;
-        let c2 = (t0 + c1) * 0.5;
-        let b3 = (b2 + c2) * 0.5;
-        let (first_len, t) = Self::recurse(a0, b1, b2, b3, desired_len, 0.5 * tolerance, level + 1, min_level);
+        // split into two bezier curves
+        let b_start = a_start;
+
+        // get a new ctrl point halfway between start and ctrl1
+        let b_ctrl1 = (a_start + a_ctrl1) * 0.5;
+        // get a new ctrl point halfway between ctrl2 and end
+        let c_ctrl2 = (a_ctrl2 + a_end) * 0.5;
+
+        let a_ctrl_avg = (a_ctrl1 + a_ctrl2) * 0.5;
+        let b_ctrl2 = (b_ctrl1 + a_ctrl_avg) * 0.5;
+        let c_ctrl1 = (a_ctrl_avg + c_ctrl2) * 0.5;
+
+        let mid = (b_ctrl2 + c_ctrl1) * 0.5;
+        let b_end = mid;
+
+        let c_start = mid;
+        let c_end = a_end;
+
+        let (first_len, t) = Self::recurse(b_start, b_ctrl1, b_ctrl2, b_end, desired_len, 0.5 * tolerance, level + 1, min_level);
         let new_desired_len = {
             if let Some(desired_len) = desired_len {
                 if first_len > desired_len {
@@ -264,7 +280,7 @@ where
                 None
             }
         };
-        let (second_len, t) = Self::recurse(b3, c2, c1, a3, new_desired_len, 0.5 * tolerance, level + 1, min_level);
+        let (second_len, t) = Self::recurse(c_start, c_ctrl1, c_ctrl2, c_end, new_desired_len, 0.5 * tolerance, level + 1, min_level);
         (first_len + second_len, t * 0.5 + 0.5)
     }
 
@@ -281,7 +297,8 @@ where
             return (0.0, 0.0);
         }
         let start_level = 0;
-        let min_level = 4;
+        // 7 gets to about 2% accuracy
+        let min_level = 7;
         let (len, parametric_t) = Self::recurse(self.start, self.ctrl1, self.ctrl2, self.end, Some(desired_len), tolerance.unwrap_or_default(), start_level, min_level);
         (len, parametric_t)
     }
@@ -704,33 +721,72 @@ mod tests {
         let handle_len = 1.0;
 
         // simple straight line
-        let cb = CubicBezier2::new(
+        let cb_straight = CubicBezier2::new(
             &Position::from_array_meter([0.0, 0.0]),
             &Position::from_array_meter([handle_len, 0.0]),
             &Position::from_array_meter([bezier_len - handle_len, 0.0]),
             &Position::from_array_meter([bezier_len, 0.0]),
         );
-        let cb_length0 = cb.arclen(128);
-        assert!(
-            (cb_length0.get::<meter>() - bezier_len).abs() < 0.003 * bezier_len,
-            "{:?} {:?}", cb_length0, bezier_len,
-        );
-        let cb_length = cb.arclen_castlejau();
-        assert!(
-            (cb_length.get::<meter>() - bezier_len).abs() < 0.0000001 * bezier_len,
-            "{cb_length:?} {bezier_len}",
+
+        // quarter circle
+        let num = 4.0;
+        let radius = num / 2.0 * bezier_len / PI as NativeFloat;
+        let handle = radius * 4.0 / 3.0 * (PI as NativeFloat / (2.0 * num)).tan();
+        let cb_quarter_circle = CubicBezier2::new(
+            &Position::from_array_meter([0.0, 0.0]),
+            &Position::from_array_meter([handle, 0.0]),
+            &Position::from_array_meter([radius, radius - handle]),
+            &Position::from_array_meter([radius, radius]),
         );
 
-        for t in [0.0, 0.05, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 0.9, 0.95, 1.0] {
-            let euclidean_t = EuclideanTFrac(t);
-            let (achieved_euclidean_t, parametric_t) = cb.euclidean_to_parametric_t(euclidean_t, cb_length);
+        // half circle
+        let num = 2.0;
+        let radius = num / 2.0 * bezier_len / PI as NativeFloat;
+        let handle = radius * 4.0 / 3.0 * (PI as NativeFloat / (2.0 * num)).tan();
+        let cb_half_circle = CubicBezier2::new(
+            &Position::from_array_meter([0.0, 0.0]),
+            &Position::from_array_meter([handle, 0.0]),
+            &Position::from_array_meter([handle, 2.0 * radius]),
+            &Position::from_array_meter([0.0, 2.0 * radius]),
+        );
+
+        for (ind, cb) in [cb_straight, cb_quarter_circle, cb_half_circle].iter().enumerate() {
+            let cb_length = cb.arclen(128);
             assert!(
-                (euclidean_t.0 - achieved_euclidean_t.0).abs() < 0.09,
-                "{euclidean_t:?} {achieved_euclidean_t:?}, (-> parametric parametric {parametric_t:?})",
-                // (t * cb_length - achieved_len).get::<meter>().abs() < 0.01,
-                // "{t} * {cb_length:?} ({:?}) = {achieved_len:?}, parametric {parametric_t:?}", t * cb_length);
+                (cb_length.get::<meter>() - bezier_len).abs() < 0.01 * bezier_len,
+                "{ind} arclen {:.3}m, expected {:?}m", cb_length.get::<meter>(), bezier_len,
             );
-            println!("{euclidean_t:?} {achieved_euclidean_t:?}, (-> parametric parametric {parametric_t:?})");
+            let cb_length = cb.arclen_castlejau();
+            assert!(
+                (cb_length.get::<meter>() - bezier_len).abs() < 0.01 * bezier_len,
+                "{ind} arclen castlejau {:.3}m, expected {:?}m", cb_length.get::<meter>(), bezier_len,
+            );
+
+            for t in [0.0, 0.01, 0.05, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 0.9, 0.95, 0.97, 1.0] {
+                let euclidean_t = EuclideanTFrac(t);
+                let (achieved_euclidean_t, parametric_t) = cb.euclidean_to_parametric_t(euclidean_t, cb_length);
+
+                let euclidean_t_round_trip = cb.parametric_to_euclidean_t(parametric_t, cb_length);
+                let diff = achieved_euclidean_t.0 - euclidean_t_round_trip.0;
+                assert!(diff.abs() < 0.015, "{diff:.6} euclidean_t {} {} {}", euclidean_t.0, achieved_euclidean_t.0, euclidean_t_round_trip.0);
+
+                let diff = euclidean_t.0 - achieved_euclidean_t.0;
+                assert!(
+                    diff.abs() < 0.02,
+                    "{ind} euclidean {:.3} - {:.3} = {diff:.4}, (-> parametric {:.3})",
+                    euclidean_t.0,
+                    achieved_euclidean_t.0,
+                    parametric_t.0,
+                    // (t * cb_length - achieved_len).get::<meter>().abs() < 0.01,
+                    // "{t} * {cb_length:?} ({:?}) = {achieved_len:?}, parametric {parametric_t:?}", t * cb_length);
+                );
+                println!(
+                    "{ind} euclidean {:.3} - {:.3} = {diff:.4}, (-> parametric {:.3})",
+                    euclidean_t.0,
+                    achieved_euclidean_t.0,
+                    parametric_t.0,
+                );
+            }
         }
     }
 
