@@ -104,10 +104,15 @@ impl CubicBezier2 {
     /// TODO(lucasw) return the position as well?
     pub fn euclidean_to_parametric_t(&self, euclidean_t: EuclideanTFrac, bezier_length: Length) -> (EuclideanTFrac, ParametricTFrac) {
         let desired_length = euclidean_t.0 * bezier_length;
-        let (achieved_len, parametric_tfrac) = self.0.desired_len_to_parametric_t(desired_length.get::<meter>(), None);
-        let achieved_euclidean_tfrac: NativeFloat = achieved_len / bezier_length.get::<meter>();
-        // (Length::new::<meter>(achieved_len), ParametricTFrac(parametric_tfrac))
-        (EuclideanTFrac(achieved_euclidean_tfrac), ParametricTFrac(parametric_tfrac))
+        // TODO(lucasw) achived len isn't very good, call parametric_to_euclidean_t() * length
+        // to get a higher quality result
+        let (_achieved_len, parametric_tfrac) = self.0.desired_len_to_parametric_t(desired_length.get::<meter>(), Some(0.0001));
+        // let achieved_euclidean_tfrac: NativeFloat = achieved_len / bezier_length.get::<meter>();
+        // TODO(lucasw) call parametric_to_euclidean_t on parametric_tfrac to get a better
+        // euclidean_t?
+        let parametric_t = ParametricTFrac(parametric_tfrac);
+        let euclidean_t_round_trip = self.parametric_to_euclidean_t(parametric_t, bezier_length);
+        (euclidean_t_round_trip, parametric_t)
     }
 
     pub fn eval(&self, t: ParametricTFrac) -> Position {
@@ -224,6 +229,10 @@ where
     /// either compute the full length of the curve, or find the parametric t that results
     /// in the desired length
     /// return length, parametric_t
+    /// TODO(lucasw) the achieved length only appears usable when this is called from arclen_castlejau (None for desired_len
+    /// and min_level is 0) though that seems counter intuitive
+    /// TODO(lucasw) count the number of iterations and return it along with the approx len and
+    /// parametric t
     fn recurse(a_start: P, a_ctrl1: P, a_ctrl2: P, a_end: P,
             desired_len: Option<NativeFloat>, tolerance: NativeFloat, level: u8, min_level: u8) -> (NativeFloat, NativeFloat) {
         // TODO(lucasw) when the line is straight, these values are the same so this exits
@@ -235,9 +244,12 @@ where
         // would travel through each ctrl point- the real curve length lies between
         let lower = a_start.distance(&a_end);
         let upper = a_start.distance(&a_ctrl1) + a_ctrl1.distance(&a_ctrl2) + a_ctrl2.distance(&a_end);
-        let in_tolerance = (upper - lower) <= (2. * tolerance);
+        let half_diff = (upper - lower) / 2.0;
+        let in_tolerance = half_diff <= tolerance;
         let over_level_threshold = level >= 8;
-        if (in_tolerance || over_level_threshold) && level >= min_level {
+        let over_min_level = level >= min_level;
+        // println!("in tolerance {in_tolerance} {half_diff:.12} < {tolerance:.12}, over level threshold {over_level_threshold}, {over_min_level} {level} >= min_level {min_level}");
+        if (in_tolerance || over_level_threshold) && over_min_level {
             let approx_len = (lower + upper) / 2.;
             let parametric_t = match desired_len {
                 Some(desired_len) => {
@@ -250,7 +262,7 @@ where
             return (approx_len, parametric_t)
         }
 
-        // split into two bezier curves
+        // split into two bezier curves- is this different than split() below?
         let b_start = a_start;
 
         // get a new ctrl point halfway between start and ctrl1
@@ -271,7 +283,12 @@ where
         let (first_len, t) = Self::recurse(b_start, b_ctrl1, b_ctrl2, b_end, desired_len, 0.5 * tolerance, level + 1, min_level);
         let new_desired_len = {
             if let Some(desired_len) = desired_len {
+                // TODO(lucasw) maybe the poor quality of reaching the desired len (vs. the good
+                // quality of getting the full length of the curve when there is no desired len is
+                // this greater than, i'ts always going to be a big step over the desired len)
+                // But that doesn't make sense with the returned t being pretty good
                 if first_len > desired_len {
+                    // t is halved because the above recurse was over half the current curve length
                     return (first_len, t * 0.5)
                 }
 
@@ -281,6 +298,8 @@ where
             }
         };
         let (second_len, t) = Self::recurse(c_start, c_ctrl1, c_ctrl2, c_end, new_desired_len, 0.5 * tolerance, level + 1, min_level);
+        // halve and add 0.5 to t to account for the 2nd recurse only covering half the curve (that is 0.0 to
+        // 1.0 over the half curve is 0.5 - 1.0 on the full curve at this recurse level)
         (first_len + second_len, t * 0.5 + 0.5)
     }
 
@@ -298,7 +317,7 @@ where
         }
         let start_level = 0;
         // 7 gets to about 2% accuracy
-        let min_level = 7;
+        let min_level = 4;
         let (len, parametric_t) = Self::recurse(self.start, self.ctrl1, self.ctrl2, self.end, Some(desired_len), tolerance.unwrap_or_default(), start_level, min_level);
         (len, parametric_t)
     }
@@ -716,6 +735,36 @@ mod tests {
     use core::f64::consts::PI;
 
     #[test]
+    fn cubic_bezier2_single_euclidean_to_parametric() {
+        // quarter circle
+        let num = 4.0;
+        let bezier_len = 10.0;
+        let radius = num / 2.0 * bezier_len / PI as NativeFloat;
+        let handle = radius * 4.0 / 3.0 * (PI as NativeFloat / (2.0 * num)).tan();
+        let cb = CubicBezier2::new(
+            &Position::from_array_meter([0.0, 0.0]),
+            &Position::from_array_meter([handle, 0.0]),
+            &Position::from_array_meter([radius, radius - handle]),
+            &Position::from_array_meter([radius, radius]),
+        );
+
+        let bezier_len = Length::new::<meter>(bezier_len);
+        let euclidean_t = EuclideanTFrac(0.333);
+        let (achieved_euclidean_t, parametric_t) = cb.euclidean_to_parametric_t(euclidean_t, bezier_len);
+
+        let diff = euclidean_t.0 - achieved_euclidean_t.0;
+        assert!(
+            diff.abs() < 0.01,
+            "euclidean {:.3} - {:.3} = {diff:.4}, (-> parametric {:.3})",
+            euclidean_t.0,
+            achieved_euclidean_t.0,
+            parametric_t.0,
+            // (t * cb_length - achieved_len).get::<meter>().abs() < 0.01,
+            // "{t} * {cb_length:?} ({:?}) = {achieved_len:?}, parametric {parametric_t:?}", t * cb_length);
+        );
+    }
+
+    #[test]
     fn cubic_bezier2_euclidean_to_parametric() {
         let bezier_len = 10.0;
         let handle_len = 1.0;
@@ -766,20 +815,15 @@ mod tests {
                 let euclidean_t = EuclideanTFrac(t);
                 let (achieved_euclidean_t, parametric_t) = cb.euclidean_to_parametric_t(euclidean_t, cb_length);
 
-                let euclidean_t_round_trip = cb.parametric_to_euclidean_t(parametric_t, cb_length);
-                let diff = achieved_euclidean_t.0 - euclidean_t_round_trip.0;
-                assert!(diff.abs() < 0.015, "{diff:.6} euclidean_t {} {} {}", euclidean_t.0, achieved_euclidean_t.0, euclidean_t_round_trip.0);
-
+                // TODO(lucasw) euclidean_t_round_trip looks to be much better than the returned
+                // value from parametric_to_euclidean_t()
                 let diff = euclidean_t.0 - achieved_euclidean_t.0;
-                assert!(
-                    diff.abs() < 0.02,
-                    "{ind} euclidean {:.3} - {:.3} = {diff:.4}, (-> parametric {:.3})",
-                    euclidean_t.0,
-                    achieved_euclidean_t.0,
-                    parametric_t.0,
-                    // (t * cb_length - achieved_len).get::<meter>().abs() < 0.01,
-                    // "{t} * {cb_length:?} ({:?}) = {achieved_len:?}, parametric {parametric_t:?}", t * cb_length);
-                );
+                assert!(diff.abs() < 0.002, "{ind} {diff:.6} euclidean_t {} {}", euclidean_t.0, achieved_euclidean_t.0);
+                // let euclidean_t_round_trip = cb.parametric_to_euclidean_t(parametric_t, cb_length);
+                // let diff = achieved_euclidean_t.0 - euclidean_t_round_trip.0;
+                // the error was up to 0.1 before doing teh round trip
+                // assert!(diff.abs() < 0.002, "{ind} {diff:.6} euclidean_t {} {} {}", euclidean_t.0, achieved_euclidean_t.0, euclidean_t_round_trip.0);
+
                 println!(
                     "{ind} euclidean {:.3} - {:.3} = {diff:.4}, (-> parametric {:.3})",
                     euclidean_t.0,
