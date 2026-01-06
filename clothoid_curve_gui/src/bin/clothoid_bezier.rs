@@ -6,7 +6,8 @@ December 2025
 show how well a set of bezier curves can approximate a clothoid curve
 */
 use clothoid_bezier::f64::{
-    cubic_bezier::EuclideanTFrac, BezierToClothoid, ClothoidBezierApproximation, CubicBezier2,
+    cubic_bezier::{EuclideanTFrac, ParametricTFrac},
+    BezierToClothoid, ClothoidBezierApproximation, CubicBezier2,
 };
 use clothoid_curve::f64::{
     curvature_per_meter, curvature_per_meter_float, AngleCosSin, Clothoid, CurvaturePerLength,
@@ -21,6 +22,7 @@ use tracing::warn;
 use uom::num_traits::Zero;
 use uom::si::{
     angle::degree,
+    area::square_meter,
     curvature::radian_per_meter,
     f64::{Angle, Curvature, Length},
     length::meter,
@@ -39,6 +41,7 @@ struct ClothoidToBezier {
     bezier: CubicBezier2,
     handle_length0: f64,
     handle_length1: f64,
+    parametric_t: f64,
     end_x: f64,
     end_y: f64,
     end_angle: f64,
@@ -120,6 +123,41 @@ impl eframe::App for ClothoidToBezier {
             });
 
             ui.horizontal(|ui| {
+                ui.label("bezier parametric t");
+                let resp = ui.add(
+                    egui::DragValue::new(&mut self.parametric_t)
+                        .speed(0.01)
+                        .range(-0.5..=1.5)
+                        .update_while_editing(false),
+                );
+                /*
+                if resp.dragged() {
+                    self.mode = Mode::Bezier;
+                }
+                */
+
+                if ui.button("split at t").clicked() {
+                    let (left, _right) = self.bezier.split(ParametricTFrac(self.parametric_t));
+                    self.end_x = left.end().x.get::<meter>();
+                    self.end_y = left.end().y.get::<meter>();
+                    self.end_angle = left.angle(ParametricTFrac(1.0)).get::<degree>();
+                    self.handle_length0 = left
+                        .start()
+                        .distance_squared(left.ctrl1())
+                        .get::<square_meter>()
+                        .sqrt();
+                    self.handle_length1 = left
+                        .end()
+                        .distance_squared(left.ctrl2())
+                        .get::<square_meter>()
+                        .sqrt();
+                    self.mode = Mode::Bezier;
+                    self.bezier = left;
+                }
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("end x");
                 let resp = ui.add(
                     egui::DragValue::new(&mut self.end_x)
                         .speed(0.002)
@@ -129,6 +167,7 @@ impl eframe::App for ClothoidToBezier {
                     self.mode = Mode::Bezier;
                 }
 
+                ui.label("y");
                 let resp = ui.add(
                     egui::DragValue::new(&mut self.end_y)
                         .speed(0.002)
@@ -138,6 +177,7 @@ impl eframe::App for ClothoidToBezier {
                     self.mode = Mode::Bezier;
                 }
 
+                ui.label("angle °");
                 let resp = ui.add(
                     egui::DragValue::new(&mut self.end_angle)
                         .speed(0.3)
@@ -360,6 +400,18 @@ impl eframe::App for ClothoidToBezier {
                                 .allow_hover(false)
                                 .stroke(Stroke::new(1.5, color)),
                         );
+
+                        let t_pos = self
+                            .bezier
+                            .eval(ParametricTFrac(self.parametric_t))
+                            .as_array_meter();
+                        plot_ui.points(
+                            Points::new(vec![t_pos])
+                                .name("bezier at t")
+                                .allow_hover(false)
+                                .radius(4.5)
+                                .color(Color32::WHITE),
+                        );
                     });
 
                 ui.end_row();
@@ -462,6 +514,7 @@ impl ClothoidToBezier {
             bezier,
             handle_length0: 0.0,
             handle_length1: 0.0,
+            parametric_t: 0.5,
             target_handle_length0: 0.4,
             target_handle_length1: 0.4,
             going_to_target: true,

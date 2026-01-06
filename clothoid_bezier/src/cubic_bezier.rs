@@ -81,6 +81,8 @@ impl CubicBezier2 {
         Position::from_array_meter([self.0.end.axis(0), self.0.end.axis(1)])
     }
 
+    // TODO(lucasw) get handle 1 & 2 length
+
     pub fn arclen(&self, nsteps: usize) -> Length {
         Length::new::<meter>(self.0.arclen(nsteps))
     }
@@ -90,6 +92,12 @@ impl CubicBezier2 {
         // TODO(lucasw) not clear if tolerance is doing anything, what the right
         // value it should use
         Length::new::<meter>(self.0.arclen_castlejau(None)) // Some(0.01)))
+    }
+
+    pub fn split(&self, parametric_t: ParametricTFrac) -> (CubicBezier2, CubicBezier2) {
+        // TODO(lucasw) error if parametric_t <= 0.0 or >= 1.0
+        let (left, right) = self.0.split(parametric_t.0);
+        (CubicBezier2(left), CubicBezier2(right))
     }
 
     /// TODO(lucasw) make sure in caller that the length of parametric_t isn't already known

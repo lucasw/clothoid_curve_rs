@@ -134,6 +134,11 @@ impl Position {
     pub fn as_array_meter(&self) -> [Float; 2] {
         [self.x.get::<meter>(), self.y.get::<meter>()]
     }
+
+    pub fn distance_squared(&self, right: Position) -> Area {
+        let diff = *self - right;
+        diff.x * diff.x + diff.y * diff.y
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
