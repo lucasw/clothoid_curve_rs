@@ -5,7 +5,7 @@ use super::LineSegment;
 use super::QuadraticBezier;
 use super::*;
 use uom::si::{
-    angle::radian,
+    // angle::radian,
     curvature::radian_per_meter,
     length::meter,
 };
@@ -119,13 +119,12 @@ impl CubicBezier2 {
         point2_to_position(self.0.eval(t.0))
     }
 
+    /// TODO(lucasw) make an angle+curvature combined function that only computes
+    /// derivative once
     /// return angle and cos, sin components of angle so they needn't be recomputed
-    pub fn tangent(&self, t: ParametricTFrac) -> (Angle, (NativeFloat, NativeFloat)) {
+    pub fn angle(&self, t: ParametricTFrac) -> AngleCosSin {
         let yaw_cos_sin = self.0.tangent(t.0);
-        let yaw_cos_sin = (yaw_cos_sin.axis(0), yaw_cos_sin.axis(1));
-        let yaw = Angle::new::<radian>(atan2(yaw_cos_sin.1, yaw_cos_sin.0));
-        // TODO(lucasw) return AngleCosSin
-        (yaw, yaw_cos_sin)
+        AngleCosSin::from_cos_sin(yaw_cos_sin.axis(0), yaw_cos_sin.axis(1))
     }
 
     pub fn curvature(&self, t: ParametricTFrac) -> Curvature {

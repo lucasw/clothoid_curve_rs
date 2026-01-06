@@ -6,7 +6,7 @@ edition = "2024"
 [features]
 default = ["argmin_fit", "std"]
 argmin_fit = ["argmin", "argmin-math", "argmin-observer-slog", "finitediff"]
-std = ["clothoid_curve/std"]
+std = ["clothoid_curve/std", "tracing"]
 
 [dependencies]
 anyhow.workspace = true
@@ -21,4 +21,5 @@ finitediff = { version = "0.1.4", optional = true }
 tinyvec = "1.10.0"
 libm = "0.2.15"
 uom.workspace = true
+tracing = { workspace = true, optional = true }
 

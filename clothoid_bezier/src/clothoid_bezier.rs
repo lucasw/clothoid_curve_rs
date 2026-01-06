@@ -1,6 +1,8 @@
 // Lucas Walter
 // December 2025
 
+use clothoid_curve::f64::curvature_per_meter_float;
+
 #[cfg(feature = "argmin_fit")]
 #[allow(unused_imports)]
 use argmin::{
@@ -15,9 +17,16 @@ use argmin::{
 use argmin_observer_slog::SlogLogger;
 #[cfg(feature = "argmin_fit")]
 use finitediff::FiniteDiff;
+#[cfg(feature = "std")]
+use tracing::info;
+#[cfg(not(feature = "std"))]
+macro_rules! info {
+    ($($tt:tt)*) => {};
+}
 
 use uom::num_traits::Zero;
 use uom::si::{
+    // angle::degree,
     curvature::radian_per_meter,
     length::meter,
 };
@@ -174,6 +183,167 @@ impl ClothoidBezierApproximation {
 
         let param = res.state.param.unwrap();
         Ok((param[0], param[1]))
+    }
+}
+
+/// approximate a bezier with a clothoid
+/// only using curvature rate and length with error defined only by the
+/// distance from the end of the clothoid to the end of the bezier curve
+/// TODO(lucasw) also the end curvature needs to be constrained?
+/// Or that can be a two-clothoid process, split a bezier, don't constrain
+/// curvature (or position?) in the middle just at the ends.
+/// Would like to be able to join Clothoid segments together with
+/// constrained positions and curvatures but that will require some
+/// relaxation somewhere.
+/// The initial position, angle is defined by by the bezier curve t = 0.0 start.
+/// The target clothoid end position by the t=1.0 end
+pub struct BezierToClothoid {
+    /// store the bezier curve but only use the derived clothoids below during
+    /// finding
+    pub bezier: CubicBezier2,
+    /// this is derived from the bezier, which
+    pub start_clothoid: Clothoid,
+    /// cached target end clothoid
+    pub target_end_clothoid: Clothoid,
+}
+
+#[cfg(feature = "argmin_fit")]
+impl CostFunction for &BezierToClothoid {
+    type Param = Vec<NativeFloat>;
+    type Output = NativeFloat;
+
+    fn cost(&self, p: &Self::Param) -> Result<Self::Output, Error> {
+        let curvature_per_length = curvature_per_meter(p[0]);
+        let length = Length::new::<meter>(p[1]);
+        self.cost0(curvature_per_length, length)
+    }
+}
+
+#[cfg(feature = "argmin_fit")]
+impl Gradient for &BezierToClothoid {
+    type Param = Vec<NativeFloat>;
+    type Gradient = Vec<NativeFloat>;
+
+    fn gradient(&self, p: &Self::Param) -> Result<Self::Gradient, Error> {
+        // Ok(p.central_diff(&|x| self.cost(x).unwrap()))
+        Ok(p.forward_diff(&|x| self.cost(x).unwrap()))
+    }
+}
+
+impl BezierToClothoid {
+    pub fn from_bezier(bezier: CubicBezier2) -> Self {
+        let curvature_per_length = CurvaturePerLength::zero();
+        let length = bezier.arclen_castlejau();
+
+        let start_clothoid = {
+            let start_pos = bezier.start();
+            // TODO(lucasw) bezier.derivative() is called redundantly in these calls
+            let t = ParametricTFrac(0.0);
+            let angle = bezier.angle(t);
+            // TODO(lucasw) there may be situations where the initial curvature needs
+            // to be overridden
+            let curvature = bezier.curvature(t);
+
+            Clothoid::create(
+                start_pos,
+                angle,
+                curvature,
+                curvature_per_length,
+                length,
+            )
+        };
+
+        let target_end_clothoid = {
+            let end_pos = bezier.end();
+            let t = ParametricTFrac(1.0);
+            let angle = bezier.angle(t);
+            // TODO(lucasw) likely will override this
+            let curvature = bezier.curvature(t);
+
+            Clothoid::create(
+                end_pos,
+                angle,
+                curvature,
+                curvature_per_length,
+                length,
+            )
+        };
+        info!("target end {target_end_clothoid:?}");
+
+        Self {
+            bezier,
+            start_clothoid,
+            target_end_clothoid,
+        }
+    }
+
+    #[cfg(feature = "argmin_fit")]
+    fn cost0(&self, curvature_per_length: CurvaturePerLength, length: Length) -> Result<NativeFloat, Error> {
+        let mut clothoid = self.start_clothoid.clone();
+        clothoid.set_curvature_rate(curvature_per_length);
+        clothoid.length = length;
+        let end_clothoid = clothoid.get_end_clothoid();
+        let delta_pos = self.target_end_clothoid.xy0 - end_clothoid.xy0;
+        let dx = delta_pos.x.get::<meter>();
+        let dy = delta_pos.y.get::<meter>();
+        // info!("{:?} - {:?} -> {dx} {dy}", self.target_end_clothoid.xy0, clothoid.xy0);
+        let cost = dx * dx + dy * dy;
+
+        // can't improve on angle given the constraints
+        /*
+        let delta_angle = (self.target_end_clothoid.theta0.angle - end_clothoid.theta0.angle)
+            .get::<degree>().abs();
+        let cost = cost + 0.01 * delta_angle;
+        */
+
+        Ok(cost)
+    }
+
+    #[cfg(feature = "argmin_fit")]
+    pub fn find_clothoid(
+        &self,
+        curvature_per_length_guess: CurvaturePerLength,
+        length_guess: Length,
+    ) -> Result<Clothoid, Error> {
+        let verbose = true;
+
+        let init_param: Vec<NativeFloat> = vec![
+            curvature_per_meter_float(curvature_per_length_guess),
+            length_guess.get::<meter>(),
+        ];
+        if verbose {
+            info!(
+                "initial cost {:?} -> {:?}",
+                init_param,
+                self.cost(&init_param)
+            );
+        }
+
+        // Pick a line search.
+        // let linesearch = HagerZhangLineSearch::new();
+        let linesearch = MoreThuenteLineSearch::new();
+        let solver = SteepestDescent::new(linesearch);
+
+        let res = Executor::new(self, solver)
+            .configure(|state| state.param(init_param).target_cost(0.000001).max_iters(150))
+            // .add_observer(SlogLogger::term(), ObserverMode::Always)
+            .run()?;
+
+        // print result
+        if verbose {
+            info!("{res}");
+        }
+
+        let param = res.state.param.unwrap();
+        let curvature_per_length = curvature_per_meter(param[0]);
+        let length = Length::new::<meter>(param[1]);
+        Ok(Clothoid::create(
+            self.start_clothoid.xy0,
+            self.start_clothoid.theta0,
+            self.start_clothoid.curvature(),
+            curvature_per_length,
+            length,
+        ))
     }
 }
 

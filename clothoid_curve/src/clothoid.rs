@@ -15,7 +15,7 @@ use core::cmp::PartialEq;
 use core::iter::Iterator;
 use core::default::Default;
 use core::prelude::rust_2024::derive;
-use core::ops::Neg;
+use core::ops::{Neg, Sub};
 
 use serde::{Deserialize, Serialize};
 
@@ -112,6 +112,17 @@ impl Neg for Position {
     }
 }
 
+impl Sub for Position {
+    type Output = Self;
+
+    fn sub(self, right: Position) -> Self::Output {
+        Self {
+            x: self.x - right.x,
+            y: self.y - right.y,
+        }
+    }
+}
+
 impl Position {
     pub fn from_array_meter(p: [Float; 2]) -> Self {
         Position {
@@ -181,7 +192,7 @@ pub fn curvature_clamp(curvature: Curvature, min: Curvature, max: Curvature) -> 
     }
 }
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Clothoid {
     /// start point xy
     pub xy0: Position,
