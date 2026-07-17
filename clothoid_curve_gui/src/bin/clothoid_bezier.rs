@@ -24,7 +24,7 @@ use uom::si::{
     angle::degree,
     area::square_meter,
     curvature::radian_per_meter,
-    f64::{Angle, Curvature, Length},
+    f64::{Angle, Area, Curvature, Length},
     length::meter,
 };
 
@@ -372,7 +372,10 @@ impl eframe::App for ClothoidToBezier {
                             let cpt = clothoid.get_clothoid(clothoid_s_distance);
                             let ex = pt.x - cpt.xy0.x;
                             let ey = pt.y - cpt.xy0.y;
-                            let error_distance = (ex * ex + ey * ey).sqrt();
+                            let error_area: Area = ex * ex + ey * ey;
+                            // TODO(lucasw) uom 0.38 can't do this directly in no_std?
+                            let error_distance =
+                                Length::new::<meter>(error_area.get::<square_meter>().sqrt());
 
                             let bezier_curvature = self.bezier.curvature(parametric_tfrac);
                             let clothoid_curvature = cpt.curvature();
