@@ -4,13 +4,13 @@ use super::EPSILON as EPSILON;
 use super::*;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct QuadraticBezier<P: Point, const PDIM: usize> {
+pub struct QuadraticBezier<P: Point> {
     pub(crate) start: P,
     pub(crate) ctrl: P,
     pub(crate) end: P,
 }
 
-impl<P, const PDIM: usize> QuadraticBezier<P, PDIM>
+impl<P> QuadraticBezier<P>
 where
     P: Point,
 {
@@ -82,7 +82,7 @@ where
     /// The derivative is also a bezier curve but of degree n-1.
     /// In the case of a quadratic derivative it is just a line segment
     /// which also implementes eval(), as it is just a linear bezier curve.
-    pub fn derivative(&self) -> LineSegment<P, PDIM> {
+    pub fn derivative(&self) -> LineSegment<P> {
         LineSegment {
             start: (self.ctrl - self.start) * 2.0,
             end: (self.end - self.ctrl) * 2.0,
@@ -227,7 +227,7 @@ where
     }
 
     /// Returns the line segment formed by the curve's start and endpoint
-    pub fn baseline(&self) -> LineSegment<P, PDIM> {
+    pub fn baseline(&self) -> LineSegment<P> {
         LineSegment {
             start: self.start,
             end: self.end,
@@ -292,8 +292,8 @@ where
     }
 
     /// Return the bounding box of the curve as an array of (min, max) tuples for each dimension (its index)
-    pub fn bounding_box(&self) -> [(NativeFloat, NativeFloat); PDIM] {
-        let mut bounds = [(0.0, 0.0); PDIM];
+    pub fn bounding_box(&self) -> [(NativeFloat, NativeFloat); 2] {
+        let mut bounds = [(0.0, 0.0); 2];
         let derivative = self.derivative();
         // calculate coefficients for the derivative as a function of t: at + b
         // po: [1, -1]
@@ -306,7 +306,7 @@ where
             // calculate roots for t over x axis and plug them into the bezier function
             //  to get x,y values (make vec 2 bigger for t=0,t=1 values)
             let mut extrema: ArrayVec<[NativeFloat; 3]> = ArrayVec::new();
-            extrema.extend(derivative.root(a.axis(dim), b.axis(dim)).into_iter());
+            extrema.extend(derivative.root(a.axis(dim), b.axis(dim)));
             // only retain roots for which t is in [0..1]
             extrema.retain(|root| -> bool { root > &mut 0.0 && root < &mut 1.0 });
             // evaluates roots in original function
@@ -331,7 +331,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::PointN;
+    use super::Point2;
     //TODO test needs to be adapted for 8 segments of quadratic order
     // #[test]
     // fn circle_approximation_error()
@@ -424,10 +424,10 @@ mod tests {
     fn eval_equivalence() {
         // all eval methods should be approximately equivalent for well defined test cases
         // and not equivalent where numerical stability becomes an issue for normal eval
-        let bezier = QuadraticBezier::<_, 2>::new(
-            PointN::new([0.0, 1.77]),
-            PointN::new([4.3, 3.0]),
-            PointN::new([3.2, -4.0]),
+        let bezier = QuadraticBezier::<_>::new(
+            Point2::new([0.0, 1.77]),
+            Point2::new([4.3, 3.0]),
+            Point2::new([3.2, -4.0]),
         );
 
         let nsteps: usize = 1000;
@@ -443,10 +443,10 @@ mod tests {
     #[test]
     fn split_equivalence() {
         // chose some arbitrary control points and construct a cubic bezier
-        let bezier = QuadraticBezier::<_, 2> {
-            start: PointN::new([0.0, 1.77]),
-            ctrl: PointN::new([4.3, 3.0]),
-            end: PointN::new([3.2, -4.0]),
+        let bezier = QuadraticBezier::<_> {
+            start: Point2::new([0.0, 1.77]),
+            ctrl: Point2::new([4.3, 3.0]),
+            end: Point2::new([3.2, -4.0]),
         };
         // split it at an arbitrary point
         let at = 0.5;
@@ -468,10 +468,10 @@ mod tests {
     #[test]
     fn bounding_box_contains() {
         // check if bounding box for a curve contains all points (with some approximation error)
-        let bezier = QuadraticBezier::<_, 2> {
-            start: PointN::new([0.0, 1.77]),
-            ctrl: PointN::new([4.3, -3.0]),
-            end: PointN::new([3.2, 4.0]),
+        let bezier = QuadraticBezier::<_> {
+            start: Point2::new([0.0, 1.77]),
+            ctrl: Point2::new([4.3, -3.0]),
+            end: Point2::new([3.2, 4.0]),
         };
 
         let bounds = bezier.bounding_box();
@@ -492,14 +492,14 @@ mod tests {
     #[test]
     fn distance_to_point() {
         // degree 3, 4 control points => 4+3+1=8 knots
-        let curve = QuadraticBezier::<_, 2> {
-            start: PointN::new([0.0, 1.77]),
-            ctrl: PointN::new([4.3, 3.0]),
-            end: PointN::new([3.2, -4.0]),
+        let curve = QuadraticBezier::<_> {
+            start: Point2::new([0.0, 1.77]),
+            ctrl: Point2::new([4.3, 3.0]),
+            end: Point2::new([3.2, -4.0]),
         };
         assert!(
-            curve.distance_to_point(PointN::new([-5.1, -5.6]))
-                > curve.distance_to_point(PointN::new([5.1, 5.6]))
+            curve.distance_to_point(Point2::new([-5.1, -5.6]))
+                > curve.distance_to_point(Point2::new([5.1, 5.6]))
         );
     }
 }

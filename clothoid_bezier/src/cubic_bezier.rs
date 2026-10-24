@@ -1,6 +1,6 @@
 /// Adapted from stroke cubic_bezier
 // use serde::{Deserialize, Serialize};
-use super::point::Point;
+use super::point::Point2;
 use super::LineSegment;
 use super::QuadraticBezier;
 use super::*;
@@ -10,12 +10,12 @@ use uom::si::{
     length::meter,
 };
 
-fn position_to_point2(pos: &Position) -> PointN<2> {
+fn position_to_point2(pos: &Position) -> Point2 {
     let xy: [NativeFloat; 2] = [pos.x.get::<meter>(), pos.y.get::<meter>()];
-    PointN::new(xy)
+    Point2::new(xy)
 }
 
-fn point2_to_position(p: PointN<2>) -> Position {
+fn point2_to_position(p: Point2) -> Position {
     Position {
         x: Length::new::<meter>(p.axis(0)),
         y: Length::new::<meter>(p.axis(1)),
@@ -23,7 +23,7 @@ fn point2_to_position(p: PointN<2>) -> Position {
 }
 
 // TODO(lucasw) can I avoid the redundant sizes?
-type CubicBezier2Base = CubicBezier::<PointN<2>, 2>;
+type CubicBezier2Base = CubicBezier::<Point2>;
 #[derive(Clone, Debug, PartialEq)]
 pub struct CubicBezier2(CubicBezier2Base);
 
@@ -154,7 +154,7 @@ impl CubicBezier2 {
 // TODO(lucasw) the vim syntax highlighting doesn't like the triple slashes followed by triple
 // back-tick above, but putting the ':' on the same line avoids it
 #[derive(Copy, Clone, Debug, PartialEq)] // , Deserialize, Serialize)]
-pub struct CubicBezier<P, const PDIM: usize> {
+pub struct CubicBezier<P> {
     pub start: P,
     pub ctrl1: P,
     pub ctrl2: P,
@@ -162,7 +162,7 @@ pub struct CubicBezier<P, const PDIM: usize> {
 }
 
 //#[allow(dead_code)]
-impl<P, const PDIM: usize> CubicBezier<P, PDIM>
+impl<P> CubicBezier<P>
 where
     P: Point,
 {
@@ -363,7 +363,7 @@ where
     /// Return the derivative curve.
     /// The derivative is also a bezier curve but of degree n-1 (cubic->quadratic)
     /// Since it returns the derivative function, eval() needs to be called separately
-    pub fn derivative(&self) -> QuadraticBezier<P, PDIM> {
+    pub fn derivative(&self) -> QuadraticBezier<P> {
         QuadraticBezier {
             start: (self.ctrl1 - self.start) * 3.0,
             ctrl: (self.ctrl2 - self.ctrl1) * 3.0,
@@ -548,7 +548,7 @@ where
         distance
     }
 
-    pub fn baseline(&self) -> LineSegment<P, PDIM> {
+    pub fn baseline(&self) -> LineSegment<P> {
         LineSegment {
             start: self.start,
             end: self.end,
@@ -690,7 +690,7 @@ where
     }
 
     /// Return the bounding box of the curve as an array of (min, max) tuples for each dimension (its index)
-    pub fn bounding_box(&self) -> [(NativeFloat, NativeFloat); PDIM] {
+    pub fn bounding_box(&self) -> [(NativeFloat, NativeFloat); 2] {
         // calculate coefficients for the derivative: at^2 + bt + c
         // from the expansion of the cubic bezier curve: sum_i=0_to_3( binomial(3, i) * t^i * (1-t)^(n-i) )
         // yields coeffcients
@@ -698,7 +698,7 @@ where
         // p1: [0,  2, -2]
         // p2: [0,  0,  1]
         //      c   b   a
-        let mut bounds = [(0.0, 0.0); PDIM];
+        let mut bounds = [(0.0, 0.0); 2];
         let derivative = self.derivative();
         // calculate coefficients for derivative
         let a: P = derivative.start + derivative.ctrl * -2.0 + derivative.end;
@@ -712,8 +712,7 @@ where
             let mut extrema: ArrayVec<[NativeFloat; 4]> = ArrayVec::new();
             extrema.extend(
                 derivative
-                    .real_roots(a.axis(dim), b.axis(dim), c.axis(dim))
-                    .into_iter(),
+                    .real_roots(a.axis(dim), b.axis(dim), c.axis(dim)),
             );
             // only retain roots for which t is in [0..1]
             extrema.retain(|root| -> bool { root > &mut 0.0 && root < &mut 1.0 });
@@ -739,7 +738,7 @@ where
 #[cfg(test)]
 mod tests {
     extern crate std;
-    use super::PointN;
+    use super::Point2;
     use super::*;
     use std::println;
     use core::f64::consts::PI;
@@ -911,29 +910,29 @@ mod tests {
         let nsteps = 1e3 as usize;
         let tau = 2. * PI as NativeFloat;
 
-        let bezier_quadrant_1 = CubicBezier::<_, 2> {
-            start: PointN::new([0.0, 1.0]),
-            ctrl1: PointN::new([c, 1.0]),
-            ctrl2: PointN::new([1.0, c]),
-            end: PointN::new([1.0, 0.0]),
+        let bezier_quadrant_1 = CubicBezier::<_> {
+            start: Point2::new([0.0, 1.0]),
+            ctrl1: Point2::new([c, 1.0]),
+            ctrl2: Point2::new([1.0, c]),
+            end: Point2::new([1.0, 0.0]),
         };
-        let bezier_quadrant_2 = CubicBezier::<_, 2> {
-            start: PointN::new([1.0, 0.0]),
-            ctrl1: PointN::new([1.0, -c]),
-            ctrl2: PointN::new([c, -1.0]),
-            end: PointN::new([0.0, -1.0]),
+        let bezier_quadrant_2 = CubicBezier::<_> {
+            start: Point2::new([1.0, 0.0]),
+            ctrl1: Point2::new([1.0, -c]),
+            ctrl2: Point2::new([c, -1.0]),
+            end: Point2::new([0.0, -1.0]),
         };
-        let bezier_quadrant_3 = CubicBezier::<_, 2> {
-            start: PointN::new([0.0, -1.0]),
-            ctrl1: PointN::new([-c, -1.0]),
-            ctrl2: PointN::new([-1.0, -c]),
-            end: PointN::new([-1.0, 0.0]),
+        let bezier_quadrant_3 = CubicBezier::<_> {
+            start: Point2::new([0.0, -1.0]),
+            ctrl1: Point2::new([-c, -1.0]),
+            ctrl2: Point2::new([-1.0, -c]),
+            end: Point2::new([-1.0, 0.0]),
         };
-        let bezier_quadrant_4 = CubicBezier::<_, 2> {
-            start: PointN::new([-1.0, 0.0]),
-            ctrl1: PointN::new([-1.0, c]),
-            ctrl2: PointN::new([-c, 1.0]),
-            end: PointN::new([0.0, 1.0]),
+        let bezier_quadrant_4 = CubicBezier::<_> {
+            start: Point2::new([-1.0, 0.0]),
+            ctrl1: Point2::new([-1.0, c]),
+            ctrl2: Point2::new([-c, 1.0]),
+            end: Point2::new([0.0, 1.0]),
         };
         let circumference = (bezier_quadrant_1.arclen(nsteps)
             + bezier_quadrant_2.arclen(nsteps)
@@ -956,48 +955,48 @@ mod tests {
     #[test]
     fn find_paramteric_t() {
         let c = 0.551915024494;
-        let bezier0 = CubicBezier::<_, 2> {
-            start: PointN::new([-1.0, 0.0]),
-            ctrl1: PointN::new([-1.0, c]),
-            ctrl2: PointN::new([-c, 1.0]),
-            end: PointN::new([0.0, 1.0]),
+        let bezier0 = CubicBezier::<_> {
+            start: Point2::new([-1.0, 0.0]),
+            ctrl1: Point2::new([-1.0, c]),
+            ctrl2: Point2::new([-c, 1.0]),
+            end: Point2::new([0.0, 1.0]),
         };
 
         // TODO(lucasw) for straight lines the handles need to be 1/3 the length for the parametric
         // t function to work
-        let bezier_straight_thirds = CubicBezier::<_, 2> {
-            start: PointN::new([0.0, 0.0]),
-            ctrl1: PointN::new([3.0, 0.0]),
-            ctrl2: PointN::new([6.0, 0.0]),
-            end: PointN::new([9.0, 9.0]),
+        let bezier_straight_thirds = CubicBezier::<_> {
+            start: Point2::new([0.0, 0.0]),
+            ctrl1: Point2::new([3.0, 0.0]),
+            ctrl2: Point2::new([6.0, 0.0]),
+            end: Point2::new([9.0, 9.0]),
         };
 
-        let bezier_diag_neg = CubicBezier::<_, 2> {
-            start: PointN::new([0.0, 0.0]),
-            ctrl1: PointN::new([-1.0, -1.0]),
-            ctrl2: PointN::new([-9.0, -9.0]),
-            end: PointN::new([-10.0, -10.0]),
+        let bezier_diag_neg = CubicBezier::<_> {
+            start: Point2::new([0.0, 0.0]),
+            ctrl1: Point2::new([-1.0, -1.0]),
+            ctrl2: Point2::new([-9.0, -9.0]),
+            end: Point2::new([-10.0, -10.0]),
         };
 
-        let bezier_diag = CubicBezier::<_, 2> {
-            start: PointN::new([0.0, 0.0]),
-            ctrl1: PointN::new([1.0, 1.0]),
-            ctrl2: PointN::new([9.0, 9.0]),
-            end: PointN::new([10.0, 10.0]),
+        let bezier_diag = CubicBezier::<_> {
+            start: Point2::new([0.0, 0.0]),
+            ctrl1: Point2::new([1.0, 1.0]),
+            ctrl2: Point2::new([9.0, 9.0]),
+            end: Point2::new([10.0, 10.0]),
         };
 
-        let bezier_ud = CubicBezier::<_, 2> {
-            start: PointN::new([0.0, 0.0]),
-            ctrl1: PointN::new([0.0, 1.0]),
-            ctrl2: PointN::new([0.0, 9.0]),
-            end: PointN::new([0.0, 10.0]),
+        let bezier_ud = CubicBezier::<_> {
+            start: Point2::new([0.0, 0.0]),
+            ctrl1: Point2::new([0.0, 1.0]),
+            ctrl2: Point2::new([0.0, 9.0]),
+            end: Point2::new([0.0, 10.0]),
         };
 
-        let bezier_lr = CubicBezier::<_, 2> {
-            start: PointN::new([0.0, 0.0]),
-            ctrl1: PointN::new([1.0, 0.0]),
-            ctrl2: PointN::new([9.0, 0.0]),
-            end: PointN::new([10.0, 0.0]),
+        let bezier_lr = CubicBezier::<_> {
+            start: Point2::new([0.0, 0.0]),
+            ctrl1: Point2::new([1.0, 0.0]),
+            ctrl2: Point2::new([9.0, 0.0]),
+            end: Point2::new([10.0, 0.0]),
         };
 
         for bezier in [bezier0, bezier_straight_thirds, bezier_diag_neg, bezier_diag, bezier_ud, bezier_lr] {
@@ -1033,11 +1032,11 @@ mod tests {
     fn eval_equivalence_casteljau() {
         // all eval methods should be approximately equivalent for well defined test cases
         // and not equivalent where numerical stability becomes an issue for normal eval
-        let bezier = CubicBezier::<_, 2>::new(
-            PointN::new([0.0, 1.77]),
-            PointN::new([1.1, -1.0]),
-            PointN::new([4.3, 3.0]),
-            PointN::new([3.2, -4.0]),
+        let bezier = CubicBezier::<_>::new(
+            Point2::new([0.0, 1.77]),
+            Point2::new([1.1, -1.0]),
+            Point2::new([4.3, 3.0]),
+            Point2::new([3.2, -4.0]),
         );
 
         let nsteps: usize = 1000;
@@ -1053,11 +1052,11 @@ mod tests {
     #[test]
     fn split_equivalence() {
         // chose some arbitrary control points and construct a cubic bezier
-        let bezier = CubicBezier::<_, 2> {
-            start: PointN::new([0.0, 1.77]),
-            ctrl1: PointN::new([2.9, 0.0]),
-            ctrl2: PointN::new([4.3, 3.0]),
-            end: PointN::new([3.2, -4.0]),
+        let bezier = CubicBezier::<_> {
+            start: Point2::new([0.0, 1.77]),
+            ctrl1: Point2::new([2.9, 0.0]),
+            ctrl2: Point2::new([4.3, 3.0]),
+            end: Point2::new([3.2, -4.0]),
         };
         // split it at an arbitrary point
         let at = 0.5;
@@ -1079,11 +1078,11 @@ mod tests {
     #[test]
     fn bounding_box_contains() {
         // check if bounding box for a curve contains all points (with some approximation error)
-        let bezier = CubicBezier::<_, 2> {
-            start: PointN::new([0.0, 1.77]),
-            ctrl1: PointN::new([2.9, 0.0]),
-            ctrl2: PointN::new([4.3, -3.0]),
-            end: PointN::new([3.2, 4.0]),
+        let bezier = CubicBezier::<_> {
+            start: Point2::new([0.0, 1.77]),
+            ctrl1: Point2::new([2.9, 0.0]),
+            ctrl2: Point2::new([4.3, -3.0]),
+            end: Point2::new([3.2, 4.0]),
         };
 
         let bounds = bezier.bounding_box();
@@ -1105,18 +1104,18 @@ mod tests {
 
     #[test]
     fn closest_to_point_on_straight_line() {
-        let bezier = CubicBezier::<_, 2> {
-            start: PointN::new([0.0, 0.0]),
-            ctrl1: PointN::new([1.0, 0.0]),
-            ctrl2: PointN::new([9.0, 0.0]),
-            end: PointN::new([10.0, 0.0]),
+        let bezier = CubicBezier::<_> {
+            start: Point2::new([0.0, 0.0]),
+            ctrl1: Point2::new([1.0, 0.0]),
+            ctrl2: Point2::new([9.0, 0.0]),
+            end: Point2::new([10.0, 0.0]),
         };
 
         for desired_len in [0.0, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0] {
             let (_found_len, parametric_t, num_iterations) = bezier.desired_len_to_parametric_t(desired_len, None);
             println!("{desired_len} num iterations {num_iterations}");
             let expected_distance = 2.0;
-            let point_off_line = PointN::new([desired_len, expected_distance]);
+            let point_off_line = Point2::new([desired_len, expected_distance]);
             let (closest_point_on_line, t, distance) = bezier.closest_to_point(point_off_line);
             println!("{desired_len} {parametric_t} -> {closest_point_on_line:?} {t} {distance}");
             assert!((t - parametric_t).abs() < 0.01, "t {t}, expected {parametric_t}");
@@ -1127,20 +1126,20 @@ mod tests {
     #[test]
     fn distance_to_point() {
         // degree 3, 4 control points => 4+3+1=8 knots
-        let curve = CubicBezier::<_, 2> {
-            start: PointN::new([0.0, 1.77]),
-            ctrl1: PointN::new([1.1, -1.0]),
-            ctrl2: PointN::new([4.3, 3.0]),
-            end: PointN::new([3.2, -4.0]),
+        let curve = CubicBezier::<_> {
+            start: Point2::new([0.0, 1.77]),
+            ctrl1: Point2::new([1.1, -1.0]),
+            ctrl2: Point2::new([4.3, 3.0]),
+            end: Point2::new([3.2, -4.0]),
         };
         assert!(
-            curve.distance_to_point(PointN::new([-5.1, -5.6]))
-                > curve.distance_to_point(PointN::new([5.1, 5.6]))
+            curve.distance_to_point(Point2::new([-5.1, -5.6]))
+                > curve.distance_to_point(Point2::new([5.1, 5.6]))
         );
 
         // make sure the default nsteps isn't that bad
         for pt_x in [-3.0, -2.0, 0.0, 4.0, 5.0, 6.0] {
-            let pt = PointN::new([pt_x, 4.0]);
+            let pt = Point2::new([pt_x, 4.0]);
             let good_nsteps = 512;
             let good_distance = curve.distance_to_point_with_nsteps(pt, good_nsteps);
             let test_distance = curve.distance_to_point(pt);

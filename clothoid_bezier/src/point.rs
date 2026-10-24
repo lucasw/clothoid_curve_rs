@@ -9,12 +9,8 @@ use core::{
     ops::{Add, Mul, Sub},
 };
 
-// const PDIM: usize = 2;
-
 /// The Point trait defines constituents Trait requirements and is the only interface on which the library relies.
 ///
-/// The associated constant DIM is necessary so that the memory layout of
-/// its implementing type can be made known to the library, whenever new instances are returned.
 pub trait Point:
     Add<Self, Output = Self>
     + Sub<Self, Output = Self>
@@ -38,7 +34,6 @@ pub trait Point:
         + Div<NativeFloat, Output = Self::Scalar>
         + Sum<NativeFloat>;
     */
-    const DIM: usize;
     // Returns the component of the Point on its axis corresponding to index e.g. [0, 1, 2] -> [x, y, z]
     /// Panics if index is greater than implementors dimension
     // TODO maybe remove in favour of iterator (?)
@@ -58,27 +53,28 @@ pub trait Point:
 /// This type only interacts with the library through
 /// the point trait, so you are free to use your own
 /// Point/Coord/Vec structures instead by implementing the (small) trait
-/// TODO(lucasw) the trait `Serialize` is not implemented for `[f64; N]`
+/// The trait `Serialize` is not implemented for `[f64; N]`
+/// so just hard-coding to Point2
 #[derive(Debug, Copy, Clone)] // , Deserialize, Serialize)]
-pub struct PointN<const N: usize>([NativeFloat; N]);
+pub struct Point2([NativeFloat; 2]);
 
-impl<const N: usize> PointN<N> {
-    pub fn new(array: [NativeFloat; N]) -> Self {
-        PointN(array)
+impl Point2 {
+    pub fn new(array: [NativeFloat; 2]) -> Self {
+        Point2(array)
     }
 }
 
 /// Initialize with the Default value for the underlying type
-impl<const N: usize> Default for PointN<N> {
+impl Default for Point2 {
     fn default() -> Self {
-        PointN([NativeFloat::default(); N])
+        Point2([NativeFloat::default(); 2])
     }
 }
 
-impl<const N: usize> PartialEq for PointN<N>
+impl PartialEq for Point2
 {
     fn eq(&self, other: &Self) -> bool {
-        for i in 0..N {
+        for i in 0..2 {
             if self.0[i] != other.0[i] {
                 return false;
             }
@@ -87,13 +83,13 @@ impl<const N: usize> PartialEq for PointN<N>
     }
 }
 
-impl<const N: usize> Add for PointN<N>
+impl Add for Point2
 {
     type Output = Self;
 
-    fn add(self, other: PointN<N>) -> PointN<N> {
+    fn add(self, other: Point2) -> Point2 {
         let mut res = self;
-        for i in 0..N {
+        for i in 0..2 {
             res.0[i] = self.0[i] + other.0[i];
         }
         res
@@ -102,26 +98,26 @@ impl<const N: usize> Add for PointN<N>
 
 /// This is not required by the Point trait or library but
 /// convenient if you want to use the type externally
-impl<const N: usize> Add<NativeFloat> for PointN<N>
+impl Add<NativeFloat> for Point2
 {
     type Output = Self;
 
-    fn add(self, _rhs: NativeFloat) -> PointN<N> {
+    fn add(self, _rhs: NativeFloat) -> Point2 {
         let mut res = self;
-        for i in 0..N {
+        for i in 0..2 {
             res.0[i] = self.0[i] + _rhs;
         }
         res
     }
 }
 
-impl<const N: usize> Sub for PointN<N>
+impl Sub for Point2
 {
     type Output = Self;
 
-    fn sub(self, other: PointN<N>) -> PointN<N> {
+    fn sub(self, other: Point2) -> Point2 {
         let mut res = self;
-        for i in 0..N {
+        for i in 0..2 {
             res.0[i] = self.0[i] - other.0[i];
         }
         res
@@ -130,28 +126,28 @@ impl<const N: usize> Sub for PointN<N>
 
 /// This is not required by the Point trait or library but
 /// convenient if you want to use the type externally
-impl<const N: usize> Sub<NativeFloat> for PointN<N>
+impl Sub<NativeFloat> for Point2
 {
     type Output = Self;
 
-    fn sub(self, _rhs: NativeFloat) -> PointN<N> {
+    fn sub(self, _rhs: NativeFloat) -> Point2 {
         let mut res = self;
-        for i in 0..N {
+        for i in 0..2 {
             res.0[i] = self.0[i] - _rhs;
         }
         res
     }
 }
 
-impl<const N: usize> Mul<NativeFloat> for PointN<N>
+impl Mul<NativeFloat> for Point2
 where
     // The mulitplication is done by mulitpling T * U => T, this
     // trait bound for T will specify this requirement as the mul operator is
     // translated to using the first operand as self and the second as rhs.
 {
-    type Output = PointN<N>;
+    type Output = Point2;
 
-    fn mul(self, rhs: NativeFloat) -> PointN<N> {
+    fn mul(self, rhs: NativeFloat) -> Point2 {
         let mut res = self;
         for i in 0..res.0.len() {
             res.0[i] *= rhs;
@@ -160,16 +156,16 @@ where
     }
 }
 
-impl<const N: usize> IntoIterator for PointN<N> {
+impl IntoIterator for Point2 {
     type Item = NativeFloat;
-    type IntoIter = core::array::IntoIter<Self::Item, N>;
+    type IntoIter = core::array::IntoIter<Self::Item, 2>;
 
     fn into_iter(self) -> Self::IntoIter {
         IntoIterator::into_iter(self.0)
     }
 }
 
-impl<'a, const N: usize> IntoIterator for &'a mut PointN<N> {
+impl<'a> IntoIterator for &'a mut Point2 {
     type Item = &'a mut NativeFloat;
     type IntoIter = slice::IterMut<'a, NativeFloat>;
 
@@ -178,37 +174,35 @@ impl<'a, const N: usize> IntoIterator for &'a mut PointN<N> {
     }
 }
 
-impl<const N: usize> Point for PointN<N>
+impl Point for Point2
 where
 {
-    const DIM: usize = { N };
-
     fn axis(&self, index: usize) -> NativeFloat {
-        assert!(index <= N);
+        assert!(index <= 2);
         self.0[index]
     }
 
     fn squared_length(&self) -> NativeFloat {
         let mut sqr_dist: NativeFloat = 0.0;
-        for i in 0..N {
+        for i in 0..2 {
             sqr_dist += self.0[i] * self.0[i];
         }
         sqr_dist
     }
 
-    fn distance(&self, b: &PointN<N>) -> NativeFloat {
+    fn distance(&self, b: &Point2) -> NativeFloat {
         sqrt((*self - *b).squared_length())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::PointN;
+    use super::Point2;
     use super::*;
     #[test]
     fn distance_test() {
-        let a = PointN::new([0.0, 0.0]);
-        let b = PointN::new([1.0, 1.0]);
+        let a = Point2::new([0.0, 0.0]);
+        let b = Point2::new([1.0, 1.0]);
         let dist = a.distance(&b);
         // assert!((dist - sqrt(2.0)).abs() < 0.00001);
         assert_eq!(dist, sqrt(2.0));

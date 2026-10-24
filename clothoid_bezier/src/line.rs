@@ -6,12 +6,12 @@ use super::*;
 /// A LineSegment is equal to a linear Bezier curve, which is why there is no
 /// specialized type for that case.
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct LineSegment<P, const PDIM: usize> {
+pub struct LineSegment<P> {
     pub(crate) start: P,
     pub(crate) end: P,
 }
 
-impl<P, const PDIM: usize> LineSegment<P, PDIM>
+impl<P> LineSegment<P>
 where
     P: Point,
 {
@@ -99,8 +99,8 @@ where
     }
 
     /// Return the bounding box of the line as an array of (min, max) tuples for each dimension (its index)
-    pub fn bounding_box(&self) -> [(NativeFloat, NativeFloat); PDIM] {
-        let mut bounds = [(NativeFloat::default(), NativeFloat::default()); PDIM];
+    pub fn bounding_box(&self) -> [(NativeFloat, NativeFloat); 2] {
+        let mut bounds = [(NativeFloat::default(), NativeFloat::default()); 2];
 
         // find min/max for that particular axis
         // TODO shoul be rewritten once 'Iterator' is implemented on P to get rid of .axis() method
@@ -118,15 +118,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::point::PointN;
+    use super::point::Point2;
     use super::*;
     /// Check whether a line segment interpolation p + t*(q-p) at t=0.5
     /// yields equal distance to the start (p)/end (q) points (up to machine accuracy).
     #[test]
     fn line_segment_interpolation() {
-        let start = PointN::new([0.0, 1.77]);
-        let end = PointN::new([4.3, 3.0]);
-        let line = LineSegment::<_, 2> {
+        let start = Point2::new([0.0, 1.77]);
+        let end = Point2::new([4.3, 3.0]);
+        let line = LineSegment::<_> {
             start,
             end,
         };
@@ -138,18 +138,17 @@ mod tests {
     /// Check whether classic pythagorean equality holds for sides 3, 4 with hypothenuse 5
     #[test]
     fn line_segment_distance_to_point() {
-        // 3D cause why not
-        let line = LineSegment::<_, 2> {
-            start: PointN::new([0.0, 1.0, 0.0]),
-            end: PointN::new([3.0, 1.0, 0.0]),
+        let line = LineSegment::<_> {
+            start: Point2::new([0.0, 1.0]),
+            end: Point2::new([3.0, 1.0]),
         };
         // dist to start should be 4; dist to end should be 5
-        let p1 = PointN::new([0.0, 5.0, 0.0]);
+        let p1 = Point2::new([0.0, 5.0]);
         assert!((line.distance_to_point(p1) - 4.0).abs() < EPSILON);
         assert!(((p1 - line.start).squared_length().sqrt() - 4.0).abs() < EPSILON);
         assert!(((p1 - line.end).squared_length().sqrt() - 5.0).abs() < EPSILON);
         // dist to midpoint (t=0.5) should be 1
-        let p2 = PointN::new([1.5, 2.0, 0.0]);
+        let p2 = Point2::new([1.5, 2.0]);
         assert!(((p2 - line.eval(0.5)).squared_length().sqrt() - 1.0).abs() < EPSILON);
     }
 }

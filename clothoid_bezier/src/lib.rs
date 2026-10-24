@@ -55,7 +55,7 @@ pub mod f32 {
     pub use cubic_bezier::{CubicBezier2, ParametricTFrac};
     pub use line::LineSegment;
     pub use point::Point;
-    pub use point::PointN;
+    pub use point::Point2;
     pub use quadratic_bezier::QuadraticBezier;
 
     // TODO(lucasw) the argmin stuff doesn't work with f32, make it only use f64
@@ -104,7 +104,7 @@ pub mod f64 {
     pub use cubic_bezier::{CubicBezier2, ParametricTFrac};
     pub use line::LineSegment;
     pub use point::Point;
-    pub use point::PointN;
+    pub use point::Point2;
     pub use quadratic_bezier::QuadraticBezier;
 
     use clothoid_curve::f64::Clothoid;

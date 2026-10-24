@@ -23,3 +23,6 @@ libm = "0.2.15"
 uom.workspace = true
 tracing = { workspace = true, optional = true }
 
+# uom area sqrt only works with std uom
+[dev-dependencies]
+uom = { version = "0.38.0" }
