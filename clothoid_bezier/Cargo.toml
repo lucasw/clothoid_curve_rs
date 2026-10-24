@@ -22,6 +22,7 @@ tinyvec = "1.10.0"
 libm = "0.2.15"
 uom.workspace = true
 tracing = { workspace = true, optional = true }
+serde.workspace = true
 
 # uom area sqrt only works with std uom
 [dev-dependencies]

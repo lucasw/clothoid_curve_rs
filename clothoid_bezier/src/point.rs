@@ -1,4 +1,4 @@
-// use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use core::iter::IntoIterator;
 use core::slice;
 
@@ -55,7 +55,7 @@ pub trait Point:
 /// Point/Coord/Vec structures instead by implementing the (small) trait
 /// The trait `Serialize` is not implemented for `[f64; N]`
 /// so just hard-coding to Point2
-#[derive(Debug, Copy, Clone)] // , Deserialize, Serialize)]
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
 pub struct Point2([NativeFloat; 2]);
 
 impl Point2 {

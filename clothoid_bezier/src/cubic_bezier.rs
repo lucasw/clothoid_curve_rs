@@ -1,5 +1,5 @@
 /// Adapted from stroke cubic_bezier
-// use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use super::point::Point2;
 use super::LineSegment;
 use super::QuadraticBezier;
@@ -24,7 +24,7 @@ fn point2_to_position(p: Point2) -> Position {
 
 // TODO(lucasw) can I avoid the redundant sizes?
 type CubicBezier2Base = CubicBezier::<Point2>;
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct CubicBezier2(CubicBezier2Base);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -153,7 +153,7 @@ impl CubicBezier2 {
 /// : ```∀ t ∈ [0..1],  P(t) = (1 - t)³ * start + 3 * (1 - t)² * t * ctrl1 + 3 * t² * (1 - t) * ctrl2 + t³ * end```
 // TODO(lucasw) the vim syntax highlighting doesn't like the triple slashes followed by triple
 // back-tick above, but putting the ':' on the same line avoids it
-#[derive(Copy, Clone, Debug, PartialEq)] // , Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct CubicBezier<P> {
     pub start: P,
     pub ctrl1: P,
