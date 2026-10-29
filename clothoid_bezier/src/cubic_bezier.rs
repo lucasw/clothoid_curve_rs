@@ -27,7 +27,7 @@ type CubicBezier2Base = CubicBezier::<Point2>;
 #[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct CubicBezier2(CubicBezier2Base);
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct ParametricTFrac(pub NativeFloat);
 
 impl ParametricTFrac {
@@ -40,7 +40,7 @@ impl ParametricTFrac {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Deserialize, Serialize)]
 // #[repr(transparent)]
 pub struct EuclideanTFrac(pub NativeFloat);
 
